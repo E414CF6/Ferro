@@ -1,0 +1,11 @@
+/target
+
+/uploads
+/*.db*
+/*.sqlite*
+
+*.rs.bk
+
+/.env
+/.env.*
+!/.env.example

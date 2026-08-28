@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: serve-postgres
+    environment:
+      POSTGRES_USER: serve
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: serve
+    ports:
+      - "5432:5432"
+    volumes:
+      - serve_pg_data:/var/lib/postgresql/data
+
+volumes:
+  serve_pg_data:
