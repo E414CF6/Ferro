@@ -1,8 +1,27 @@
 # OS & IDE files
 .DS_Store
-
 .idea/
 .vscode/
-
 *.swp
 *.swo
+
+# Rust
+/Serve/target/
+**/target/
+*.rs.bk
+
+# Node.js / Next.js
+/Vision/node_modules/
+/Vision/.next/
+/Vision/out/
+**/node_modules/
+**/.next/
+*.tsbuildinfo
+
+# Environment variables & Local databases
+.env
+.env.*
+!.env.example
+*.db*
+*.sqlite*
+/Serve/uploads/

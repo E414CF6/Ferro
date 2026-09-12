@@ -19,7 +19,7 @@ Ferro is a high-performance, full-stack social networking platform built with a 
 | Component          | Layer              | Technologies                                                                                 |
 |--------------------|--------------------|----------------------------------------------------------------------------------------------|
 | **Serve**          | Backend API        | Rust 2024, Axum 0.8, async-graphql 7.2, SQLx 0.9, Tokio, Tower-HTTP, Argon2, JWT, DataLoader |
-| **Vision**         | Web Client         | Next.js 15 (App Router), React 19, TypeScript 5, Tailwind CSS, Lucide Icons                  |
+| **Vision**         | Web Client         | Next.js 15 (App Router), React 19, TypeScript 5, Custom CSS Design System, Lucide Icons      |
 | **Infrastructure** | Database & Runtime | SQLite (Default for local development), PostgreSQL 16 Alpine, Podman / Docker Compose        |
 
 ---
@@ -31,7 +31,9 @@ Ferro/
 ├── Serve/                         # Rust GraphQL Backend API
 │   ├── Cargo.toml
 │   ├── podman-compose.yml         # Containerized PostgreSQL service
+│   ├── compose.prod.yml           # Production Compose setup
 │   ├── migrations/                # SQLx database schema migrations
+│   ├── tests/                     # Integration tests
 │   └── src/
 │       ├── application/           # Application and business services
 │       ├── domain/                # Entities, domain models, and error definitions
@@ -39,18 +41,13 @@ Ferro/
 │       ├── infrastructure/        # Database pools, DataLoaders, security, and configuration
 │       └── routes/                # Axum route handlers and health endpoints
 │
-└── Vision/                        # Client Applications
-    ├── Android/                   # Native Android Application (Jetpack Compose)
-    │   ├── app/                   # App module (MVI / MVVM clean architecture)
-    │   │   └── src/main/java/com/ferro/app/
-    │   │       ├── core/          # Network client, DataStore session, theme, and domain models
-    │   │       ├── data/          # Repository implementations and dependency injection
-    │   │       └── ui/            # Compose screens, components, view models, and navigation
-    │   └── gradle/libs.versions.toml
-    │
-    └── Web/                       # Web Application (Next.js 15)
-        ├── package.json
-        └── src/                   # Next.js App Router pages and UI components
+└── Vision/                        # Next.js 15 Web Application
+    ├── package.json
+    ├── next.config.ts
+    └── src/
+        ├── app/                   # Next.js App Router pages and global design system
+        ├── components/            # UI components and modals
+        └── lib/                   # Auth context, Toast context, GraphQL client, types
 ```
 
 ---
@@ -86,16 +83,7 @@ cargo run --bin seed
 
 ---
 
-### 2. Running the Android Client (`Vision/Android`)
-
-1. Open the `Vision/Android` directory in Android Studio.
-2. Sync the project with Gradle files.
-3. Launch on an Android Emulator (configured by default to connect to the host via `http://10.0.2.2:8080/graphql`).
-4. For physical devices, update the server URL in the in-app settings screen to your host machine's local IP address.
-
----
-
-### 3. Running the Web Client (`Vision`)
+### 2. Running the Web Client (`Vision`)
 
 From the `Vision` directory:
 
@@ -108,6 +96,15 @@ npm run dev
 ```
 
 Open `http://localhost:3000` in your web browser.
+
+---
+
+### 3. Native Android Client (`Vision/Android` - Roadmap)
+
+A native Android client using Jetpack Compose and MVI / Clean Architecture is planned. When available:
+1. Open `Vision/Android` in Android Studio.
+2. Sync the project with Gradle files.
+3. Run on an Android Emulator (connected via `http://10.0.2.2:8080/graphql`).
 
 ---
 

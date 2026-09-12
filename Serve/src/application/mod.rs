@@ -27,7 +27,7 @@ pub use social_service::SocialService;
 pub use story_service::StoryService;
 
 use crate::infrastructure::config::AuthConfig;
-use crate::infrastructure::db::postgres::Database;
+use crate::infrastructure::db::database::Database;
 use std::sync::Arc;
 
 /// Unified Application Services Container

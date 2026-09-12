@@ -12,9 +12,10 @@ import {Heart, Link as LinkIcon, MessageCircle, MoreHorizontal, Send, Share2, Tr
 interface PostCardProps {
     post: Post;
     onPostDeleted?: () => void;
+    onPostUpdated?: () => void;
 }
 
-export default function PostCard({post, onPostDeleted}: PostCardProps) {
+export default function PostCard({post, onPostDeleted, onPostUpdated}: PostCardProps) {
     const {user} = useAuth();
     const {showToast} = useToast();
 

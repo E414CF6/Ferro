@@ -3,20 +3,20 @@ use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::{Conversation, ConversationSummary, DirectMessage, User};
 use crate::domain::repositories::DmRepository;
 use crate::domain::validation::validate_dm_content;
-use crate::infrastructure::db::postgres::Database;
+use crate::infrastructure::db::database::Database;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 use uuid::Uuid;
 
 /// Application Service orchestrating Direct Messages, Group Chats, and Conversations
 #[derive(Clone)]
-pub struct DmService {
-    db: Arc<Database>,
+pub struct DmService<R: DmRepository = Database> {
+    repo: Arc<R>,
 }
 
-impl DmService {
-    pub fn new(db: Arc<Database>) -> Self {
-        Self { db }
+impl<R: DmRepository> DmService<R> {
+    pub fn new(repo: Arc<R>) -> Self {
+        Self { repo }
     }
 
     pub async fn send_direct_message(
@@ -32,7 +32,7 @@ impl DmService {
             ));
         }
         validate_dm_content(&content)?;
-        self.db
+        self.repo
             .send_direct_message(sender_id, recipient_id, content)
             .await
     }
@@ -44,13 +44,13 @@ impl DmService {
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
     ) -> (Vec<DirectMessage>, bool) {
-        self.db
+        self.repo
             .get_direct_messages_cursor(user1_id, user2_id, first, after)
             .await
     }
 
     pub async fn get_conversations(&self, user_id: Uuid) -> Vec<ConversationSummary> {
-        self.db.get_conversations(user_id).await
+        self.repo.get_conversations(user_id).await
     }
 
     pub async fn mark_direct_messages_as_read(
@@ -58,13 +58,13 @@ impl DmService {
         reader_id: Uuid,
         sender_id: Uuid,
     ) -> Result<bool, DomainError> {
-        self.db
+        self.repo
             .mark_direct_messages_as_read(reader_id, sender_id)
             .await
     }
 
     pub async fn get_unread_dm_count(&self, user_id: Uuid) -> usize {
-        self.db.get_unread_dm_count(user_id).await
+        self.repo.get_unread_dm_count(user_id).await
     }
 
     pub async fn create_group_conversation(
@@ -73,17 +73,17 @@ impl DmService {
         title: Option<String>,
         participant_ids: Vec<Uuid>,
     ) -> Result<Conversation, DomainError> {
-        self.db
+        self.repo
             .create_group_conversation(creator_id, title, participant_ids)
             .await
     }
 
     pub async fn get_conversation_by_id(&self, conversation_id: Uuid) -> Option<Conversation> {
-        self.db.get_conversation_by_id(conversation_id).await
+        self.repo.get_conversation_by_id(conversation_id).await
     }
 
     pub async fn get_conversation_participants(&self, conversation_id: Uuid) -> Vec<User> {
-        self.db.get_conversation_participants(conversation_id).await
+        self.repo.get_conversation_participants(conversation_id).await
     }
 
     pub async fn send_conversation_message(
@@ -93,7 +93,7 @@ impl DmService {
         content: String,
     ) -> Result<DirectMessage, DomainError> {
         validate_dm_content(&content)?;
-        self.db
+        self.repo
             .send_conversation_message(sender_id, conversation_id, content)
             .await
     }
@@ -104,7 +104,7 @@ impl DmService {
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
     ) -> (Vec<DirectMessage>, bool) {
-        self.db
+        self.repo
             .get_conversation_messages_cursor(conversation_id, first, after)
             .await
     }
@@ -116,7 +116,7 @@ impl DmService {
         new_content: String,
     ) -> Result<DirectMessage, DomainError> {
         validate_dm_content(&new_content)?;
-        self.db
+        self.repo
             .edit_direct_message(message_id, sender_id, new_content)
             .await
     }
@@ -126,10 +126,10 @@ impl DmService {
         message_id: Uuid,
         sender_id: Uuid,
     ) -> Result<bool, DomainError> {
-        self.db.delete_direct_message(message_id, sender_id).await
+        self.repo.delete_direct_message(message_id, sender_id).await
     }
 
     pub async fn get_user_group_conversations(&self, user_id: Uuid) -> Vec<Conversation> {
-        self.db.get_user_group_conversations(user_id).await
+        self.repo.get_user_group_conversations(user_id).await
     }
 }
