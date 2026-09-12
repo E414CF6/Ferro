@@ -40,7 +40,8 @@ pub trait CommentRepository: Send + Sync {
     ) -> (Vec<Comment>, bool);
     async fn get_replies_count(&self, comment_id: Uuid) -> usize;
     async fn like_comment(&self, user_id: Uuid, comment_id: Uuid) -> Result<Comment, DomainError>;
-    async fn unlike_comment(&self, user_id: Uuid, comment_id: Uuid) -> Result<Comment, DomainError>;
+    async fn unlike_comment(&self, user_id: Uuid, comment_id: Uuid)
+    -> Result<Comment, DomainError>;
     async fn get_comment_likes_count(&self, comment_id: Uuid) -> usize;
     async fn is_comment_liked_by(&self, comment_id: Uuid, user_id: Uuid) -> bool;
     async fn pin_comment(

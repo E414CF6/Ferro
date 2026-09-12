@@ -83,7 +83,9 @@ impl<R: DmRepository> DmService<R> {
     }
 
     pub async fn get_conversation_participants(&self, conversation_id: Uuid) -> Vec<User> {
-        self.repo.get_conversation_participants(conversation_id).await
+        self.repo
+            .get_conversation_participants(conversation_id)
+            .await
     }
 
     pub async fn send_conversation_message(

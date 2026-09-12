@@ -69,14 +69,18 @@ pub fn create_router_with_state(state: AppState) -> Router {
         // Static uploads directory serving
         .nest_service("/uploads", ServeDir::new(&state.config.storage.local_path))
         // GraphQL API HTTP & WebSocket endpoints
-        .route(&state.config.server.graphql_path, post(graphql::graphql_handler))
+        .route(
+            &state.config.server.graphql_path,
+            post(graphql::graphql_handler),
+        )
         .route(&ws_path, get(graphql::graphql_ws_handler));
 
     // GraphiQL IDE endpoint (enabled in development or explicitly configured)
     if state.config.server.enable_graphiql {
-        router = router
-            .route("/", get(graphql::graphiql_handler))
-            .route(&state.config.server.graphiql_path, get(graphql::graphiql_handler));
+        router = router.route("/", get(graphql::graphiql_handler)).route(
+            &state.config.server.graphiql_path,
+            get(graphql::graphiql_handler),
+        );
     }
 
     // Configure CORS layer

@@ -384,7 +384,8 @@ impl AppConfig {
             .or_else(|_| env::var("DATABASE_TYPE"))
             .unwrap_or_default();
 
-        let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
+        let database_url = env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
 
         let is_sqlite = driver_env.eq_ignore_ascii_case("sqlite")
             || driver_env.eq_ignore_ascii_case("sqlite3")

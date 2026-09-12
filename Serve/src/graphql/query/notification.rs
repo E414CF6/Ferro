@@ -1,8 +1,8 @@
 use crate::application::helpers::resolve_user_id;
 use crate::domain::repositories::NotificationRepository;
 use crate::graphql::types::{
-    NotificationConnectionGql, NotificationEdgeGql, NotificationGql, PageInfoGql,
-    decode_cursor, encode_cursor,
+    NotificationConnectionGql, NotificationEdgeGql, NotificationGql, PageInfoGql, decode_cursor,
+    encode_cursor,
 };
 use crate::infrastructure::db::postgres::Database;
 use async_graphql::{Context, ID, Object, Result};

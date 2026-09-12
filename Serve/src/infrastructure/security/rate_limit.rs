@@ -112,10 +112,7 @@ pub fn extract_client_ip(headers: &HeaderMap, connect_info: Option<&SocketAddr>)
         return cf_ip.trim().to_string();
     }
 
-    if let Some(xfwd) = headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-    {
+    if let Some(xfwd) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
         if let Some(first_ip) = xfwd.split(',').next() {
             let trimmed = first_ip.trim();
             if !trimmed.is_empty() {
@@ -149,10 +146,7 @@ pub async fn rate_limit_middleware(
     let path = req.uri().path();
 
     // Bypass rate limiting for health check, readiness and metrics endpoints
-    if path == "/health"
-        || path == "/health/live"
-        || path == "/health/ready"
-        || path == "/metrics"
+    if path == "/health" || path == "/health/live" || path == "/health/ready" || path == "/metrics"
     {
         return next.run(req).await;
     }

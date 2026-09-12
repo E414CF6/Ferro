@@ -106,9 +106,10 @@ impl CommentRepository for MockCommentRepo {
     }
 
     async fn like_comment(&self, _user_id: Uuid, comment_id: Uuid) -> Result<Comment, DomainError> {
-        let comment = self.get_comment_by_id(comment_id).await.ok_or_else(|| {
-            DomainError::new(ErrorCode::CommentNotFound, "Comment not found")
-        })?;
+        let comment = self
+            .get_comment_by_id(comment_id)
+            .await
+            .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
         Ok(comment)
     }
 
@@ -117,9 +118,10 @@ impl CommentRepository for MockCommentRepo {
         _user_id: Uuid,
         comment_id: Uuid,
     ) -> Result<Comment, DomainError> {
-        let comment = self.get_comment_by_id(comment_id).await.ok_or_else(|| {
-            DomainError::new(ErrorCode::CommentNotFound, "Comment not found")
-        })?;
+        let comment = self
+            .get_comment_by_id(comment_id)
+            .await
+            .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
         Ok(comment)
     }
 
@@ -159,7 +161,12 @@ async fn test_comment_service_with_mock_repository_creation() {
 
     // 1. Valid comment creation
     let result = service
-        .create_comment(post_id, author_id, "Hello Ferro architecture!".to_string(), None)
+        .create_comment(
+            post_id,
+            author_id,
+            "Hello Ferro architecture!".to_string(),
+            None,
+        )
         .await;
     assert!(result.is_ok());
     let comment = result.unwrap();

@@ -1,9 +1,9 @@
 #[macro_use]
 pub mod macros;
 
+pub mod database;
 pub mod entities;
 pub mod loaders;
-pub mod database;
 pub use database as postgres;
 #[allow(unused_imports)]
 pub use database::{Database, DatabaseBackend};

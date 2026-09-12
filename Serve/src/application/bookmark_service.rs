@@ -32,7 +32,9 @@ impl<R: BookmarkRepository> BookmarkService<R> {
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
     ) -> (Vec<Post>, bool) {
-        self.repo.get_saved_posts_cursor(user_id, first, after).await
+        self.repo
+            .get_saved_posts_cursor(user_id, first, after)
+            .await
     }
 
     pub async fn is_post_saved_by(&self, post_id: Uuid, user_id: Uuid) -> bool {

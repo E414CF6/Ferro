@@ -20,9 +20,10 @@ pub enum StorageService {
 impl StorageService {
     pub fn from_config(config: &StorageConfig) -> Self {
         match config.driver {
-            StorageDriver::Local => {
-                Self::Local(LocalStorage::new(&config.local_path, &config.local_base_url))
-            }
+            StorageDriver::Local => Self::Local(LocalStorage::new(
+                &config.local_path,
+                &config.local_base_url,
+            )),
             StorageDriver::S3 => Self::S3(S3Storage::new(
                 &config.s3_bucket,
                 &config.s3_region,
