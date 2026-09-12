@@ -59,7 +59,11 @@ pub fn build_schema_with_options(
     let poll_option_votes_loader =
         DataLoader::new(PollOptionVotesCountLoader::new(db.clone()), tokio::spawn);
 
-    let mut builder = Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
+    let mut builder = Schema::build(
+        QueryRoot::default(),
+        MutationRoot::default(),
+        SubscriptionRoot,
+    )
         .limit_depth(10)
         .limit_complexity(250)
         .extension(async_graphql::extensions::Tracing)
