@@ -1,7 +1,7 @@
 use crate::application::helpers::resolve_user_id;
 use crate::domain::models::{MediaType, NotificationType, PostAudience, PostMedia};
 use crate::domain::repositories::{
-    BookmarkRepository, NotificationRepository, PollRepository, PostRepository, UserRepository,
+    BookmarkRepository, NotificationRepository, PostRepository, UserRepository,
 };
 use crate::graphql::types::{CreatePollInput, MediaInput, PostAudienceGql, PostGql};
 use crate::infrastructure::db::postgres::Database;
@@ -30,18 +30,13 @@ impl PostMutation {
         let aid = resolve_user_id(ctx, author_id)?;
         let db = ctx.data::<Database>()?;
         let aud_model = audience.map(PostAudience::from);
-        let post = db
-            .create_post(aid, valid_content, aud_model)
-            .await
-            .map_err(|e| e.extend())?;
 
-        // Attach media
+        let mut post_media_list = Vec::new();
         if let Some(media_inputs) = media {
-            let mut post_media_list = Vec::new();
             for (idx, m) in media_inputs.into_iter().enumerate() {
                 post_media_list.push(PostMedia {
                     id: Uuid::new_v4(),
-                    post_id: post.id,
+                    post_id: Uuid::nil(),
                     media_url: m.media_url,
                     media_type: m
                         .media_type
@@ -54,20 +49,17 @@ impl PostMutation {
                     created_at: Utc::now(),
                 });
             }
-            let _ = db
-                .add_post_media(post.id, post_media_list)
-                .await
-                .map_err(|e| e.extend())?;
         }
 
-        // Attach poll
-        if let Some(poll_input) = poll {
-            let duration = poll_input.duration_seconds.unwrap_or(86400);
-            let _ = db
-                .create_poll(post.id, poll_input.question, poll_input.options, duration)
-                .await
-                .map_err(|e| e.extend())?;
-        }
+        let poll_tuple = poll.map(|p| {
+            let duration = p.duration_seconds.unwrap_or(86400);
+            (p.question, p.options, duration)
+        });
+
+        let post = db
+            .create_post_with_details(aid, valid_content, aud_model, post_media_list, poll_tuple)
+            .await
+            .map_err(|e| e.extend())?;
 
         // Automatic mention notifications
         if let Ok(broker) = ctx.data::<MessageBroker>() {

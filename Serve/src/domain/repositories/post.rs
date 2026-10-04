@@ -27,6 +27,14 @@ pub trait PostRepository: Send + Sync {
         content: String,
         audience: Option<PostAudience>,
     ) -> Result<Post, DomainError>;
+    async fn create_post_with_details(
+        &self,
+        author_id: Uuid,
+        content: String,
+        audience: Option<PostAudience>,
+        media: Vec<PostMedia>,
+        poll: Option<(String, Vec<String>, i64)>,
+    ) -> Result<Post, DomainError>;
     async fn create_quote_post(
         &self,
         author_id: Uuid,

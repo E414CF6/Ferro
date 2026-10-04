@@ -29,6 +29,20 @@ impl<R: PostRepository> PostService<R> {
         self.repo.create_post(author_id, content, audience).await
     }
 
+    pub async fn create_post_with_details(
+        &self,
+        author_id: Uuid,
+        content: String,
+        audience: Option<PostAudience>,
+        media: Vec<PostMedia>,
+        poll: Option<(String, Vec<String>, i64)>,
+    ) -> Result<Post, DomainError> {
+        validate_post_content(&content)?;
+        self.repo
+            .create_post_with_details(author_id, content, audience, media, poll)
+            .await
+    }
+
     pub async fn create_quote_post(
         &self,
         author_id: Uuid,

@@ -1,4 +1,7 @@
 use async_graphql::Request;
+use chrono::Utc;
+use serve::domain::models::{WikiArticle, WikiRevision};
+use serve::domain::WikiRepository;
 use serve::graphql::build_schema;
 use serve::infrastructure::{
     auth::AuthUser,
@@ -324,6 +327,95 @@ async fn test_wiki_authenticated_creation_and_seeding() {
     assert_eq!(created["userId"], logged_in_user_id.to_string());
 
     // Clean up
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+}
+
+#[tokio::test]
+async fn test_wiki_article_transaction_atomicity() {
+    let test_file = format!("./data/test_wiki_tx_{}.db", Uuid::new_v4());
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+
+    let config = DatabaseConfig::sqlite_mode(&test_file);
+    let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
+
+    let article_id = Uuid::new_v4();
+    let rev_id = Uuid::new_v4();
+
+    let article = WikiArticle {
+        id: article_id,
+        user_id: None,
+        title: "Atomic Test Landmark".to_string(),
+        slug: "atomic-test-landmark".to_string(),
+        summary: Some("Atomic summary".to_string()),
+        content: "Atomic content".to_string(),
+        latitude: 37.5,
+        longitude: 127.0,
+        zoom: 15.0,
+        category: "Test".to_string(),
+        tags: vec!["atomic".to_string()],
+        geojson: None,
+        author: "Tester".to_string(),
+        views: 0,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    let revision = WikiRevision {
+        id: rev_id,
+        article_id,
+        user_id: None,
+        title: article.title.clone(),
+        content: article.content.clone(),
+        latitude: article.latitude,
+        longitude: article.longitude,
+        edit_summary: Some("Initial revision".to_string()),
+        author: article.author.clone(),
+        created_at: Utc::now(),
+    };
+
+    // 1. Success case: both article and revision exist
+    let created = db
+        .create_article(&article, &revision)
+        .await
+        .expect("Article creation should succeed");
+    assert_eq!(created.id, article_id);
+
+    let fetched_article = db.find_article_by_id(article_id).await.unwrap();
+    assert!(fetched_article.is_some());
+    let fetched_revs = db.get_revisions(article_id, 10).await.unwrap();
+    assert_eq!(fetched_revs.len(), 1);
+
+    // 2. Conflict / rollback case: attempting to insert same article_id or duplicate revision_id
+    // Here we pass a new article but with the EXISTING revision.id (PRIMARY KEY conflict on wiki_revisions)
+    let bad_article_id = Uuid::new_v4();
+    let bad_article = WikiArticle {
+        id: bad_article_id,
+        slug: "bad-atomic-test".to_string(),
+        ..article.clone()
+    };
+    let duplicate_rev = WikiRevision {
+        id: rev_id, // Already exists! Primary key violation in wiki_revisions
+        article_id: bad_article_id,
+        ..revision.clone()
+    };
+
+    let res = db.create_article(&bad_article, &duplicate_rev).await;
+    assert!(
+        res.is_err(),
+        "Duplicate revision ID must cause transaction rollback"
+    );
+
+    // Verify rollback: bad_article MUST NOT exist in wiki_articles!
+    let rolled_back_article = db.find_article_by_id(bad_article_id).await.unwrap();
+    assert!(
+        rolled_back_article.is_none(),
+        "Article insert should have been rolled back!"
+    );
+
     let _ = std::fs::remove_file(&test_file);
     let _ = std::fs::remove_file(format!("{}-shm", &test_file));
     let _ = std::fs::remove_file(format!("{}-wal", &test_file));

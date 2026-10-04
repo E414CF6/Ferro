@@ -190,54 +190,125 @@ impl WikiRepository for Database {
     ) -> Result<WikiArticle, DomainError> {
         let tags_json = serde_json::to_string(&article.tags).unwrap_or_else(|_| "[]".to_string());
 
-        let res = db_execute!(
-            self,
-            "INSERT INTO wiki_articles (id, user_id, title, slug, summary, content, latitude, longitude, zoom, category, tags, geojson, author, views, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
-            article.id,
-            article.user_id,
-            &article.title,
-            &article.slug,
-            article.summary.as_deref(),
-            &article.content,
-            article.latitude,
-            article.longitude,
-            article.zoom,
-            &article.category,
-            &tags_json,
-            article.geojson.as_deref(),
-            &article.author,
-            article.views,
-            article.created_at,
-            article.updated_at
-        );
+        match self.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let mut tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to begin transaction")
+                })?;
 
-        if let Err(e) = res {
-            error!(target: "serve::wiki_repo", error = %e, "Failed to insert wiki article");
-            return Err(DomainError::new(
-                ErrorCode::WikiArticleCreateFailed,
-                "Failed to create wiki article",
-            ));
-        }
+                sqlx::query(
+                    "INSERT INTO wiki_articles (id, user_id, title, slug, summary, content, latitude, longitude, zoom, category, tags, geojson, author, views, created_at, updated_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+                )
+                .bind(article.id)
+                .bind(article.user_id)
+                .bind(&article.title)
+                .bind(&article.slug)
+                .bind(article.summary.as_deref())
+                .bind(&article.content)
+                .bind(article.latitude)
+                .bind(article.longitude)
+                .bind(article.zoom)
+                .bind(&article.category)
+                .bind(&tags_json)
+                .bind(article.geojson.as_deref())
+                .bind(&article.author)
+                .bind(article.views)
+                .bind(article.created_at)
+                .bind(article.updated_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to insert wiki article");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to create wiki article")
+                })?;
 
-        let rev_res = db_execute!(
-            self,
-            "INSERT INTO wiki_revisions (id, article_id, user_id, title, content, latitude, longitude, edit_summary, author, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-            revision.id,
-            revision.article_id,
-            revision.user_id,
-            &revision.title,
-            &revision.content,
-            revision.latitude,
-            revision.longitude,
-            revision.edit_summary.as_deref(),
-            &revision.author,
-            revision.created_at
-        );
+                sqlx::query(
+                    "INSERT INTO wiki_revisions (id, article_id, user_id, title, content, latitude, longitude, edit_summary, author, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                )
+                .bind(revision.id)
+                .bind(revision.article_id)
+                .bind(revision.user_id)
+                .bind(&revision.title)
+                .bind(&revision.content)
+                .bind(revision.latitude)
+                .bind(revision.longitude)
+                .bind(revision.edit_summary.as_deref())
+                .bind(&revision.author)
+                .bind(revision.created_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to insert initial wiki revision");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to insert initial wiki revision")
+                })?;
 
-        if let Err(e) = rev_res {
-            error!(target: "serve::wiki_repo", error = %e, "Failed to insert initial wiki revision");
+                tx.commit().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to commit wiki article transaction");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to commit transaction")
+                })?;
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let mut tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to begin transaction")
+                })?;
+
+                sqlx::query(
+                    "INSERT INTO wiki_articles (id, user_id, title, slug, summary, content, latitude, longitude, zoom, category, tags, geojson, author, views, created_at, updated_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
+                )
+                .bind(article.id)
+                .bind(article.user_id)
+                .bind(&article.title)
+                .bind(&article.slug)
+                .bind(article.summary.as_deref())
+                .bind(&article.content)
+                .bind(article.latitude)
+                .bind(article.longitude)
+                .bind(article.zoom)
+                .bind(&article.category)
+                .bind(&tags_json)
+                .bind(article.geojson.as_deref())
+                .bind(&article.author)
+                .bind(article.views)
+                .bind(article.created_at)
+                .bind(article.updated_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to insert wiki article");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to create wiki article")
+                })?;
+
+                sqlx::query(
+                    "INSERT INTO wiki_revisions (id, article_id, user_id, title, content, latitude, longitude, edit_summary, author, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                )
+                .bind(revision.id)
+                .bind(revision.article_id)
+                .bind(revision.user_id)
+                .bind(&revision.title)
+                .bind(&revision.content)
+                .bind(revision.latitude)
+                .bind(revision.longitude)
+                .bind(revision.edit_summary.as_deref())
+                .bind(&revision.author)
+                .bind(revision.created_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to insert initial wiki revision");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to insert initial wiki revision")
+                })?;
+
+                tx.commit().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to commit wiki article transaction");
+                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to commit transaction")
+                })?;
+            }
         }
 
         Ok(article.clone())
@@ -250,51 +321,119 @@ impl WikiRepository for Database {
     ) -> Result<WikiArticle, DomainError> {
         let tags_json = serde_json::to_string(&article.tags).unwrap_or_else(|_| "[]".to_string());
 
-        let res = db_execute!(
-            self,
-            "UPDATE wiki_articles
-             SET title = $1, summary = $2, content = $3, latitude = $4, longitude = $5,
-                 zoom = $6, category = $7, tags = $8, geojson = $9, updated_at = $10
-             WHERE id = $11",
-            &article.title,
-            article.summary.as_deref(),
-            &article.content,
-            article.latitude,
-            article.longitude,
-            article.zoom,
-            &article.category,
-            &tags_json,
-            article.geojson.as_deref(),
-            article.updated_at,
-            article.id
-        );
+        match self.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let mut tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to begin transaction")
+                })?;
 
-        if let Err(e) = res {
-            error!(target: "serve::wiki_repo", error = %e, "Failed to update wiki article");
-            return Err(DomainError::new(
-                ErrorCode::WikiArticleUpdateFailed,
-                "Failed to update wiki article",
-            ));
-        }
+                sqlx::query(
+                    "UPDATE wiki_articles
+                     SET title = $1, summary = $2, content = $3, latitude = $4, longitude = $5,
+                         zoom = $6, category = $7, tags = $8, geojson = $9, updated_at = $10
+                     WHERE id = $11",
+                )
+                .bind(&article.title)
+                .bind(article.summary.as_deref())
+                .bind(&article.content)
+                .bind(article.latitude)
+                .bind(article.longitude)
+                .bind(article.zoom)
+                .bind(&article.category)
+                .bind(&tags_json)
+                .bind(article.geojson.as_deref())
+                .bind(article.updated_at)
+                .bind(article.id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to update wiki article");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to update wiki article")
+                })?;
 
-        let rev_res = db_execute!(
-            self,
-            "INSERT INTO wiki_revisions (id, article_id, user_id, title, content, latitude, longitude, edit_summary, author, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-            revision.id,
-            revision.article_id,
-            revision.user_id,
-            &revision.title,
-            &revision.content,
-            revision.latitude,
-            revision.longitude,
-            revision.edit_summary.as_deref(),
-            &revision.author,
-            revision.created_at
-        );
+                sqlx::query(
+                    "INSERT INTO wiki_revisions (id, article_id, user_id, title, content, latitude, longitude, edit_summary, author, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                )
+                .bind(revision.id)
+                .bind(revision.article_id)
+                .bind(revision.user_id)
+                .bind(&revision.title)
+                .bind(&revision.content)
+                .bind(revision.latitude)
+                .bind(revision.longitude)
+                .bind(revision.edit_summary.as_deref())
+                .bind(&revision.author)
+                .bind(revision.created_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to insert update wiki revision");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to insert update revision")
+                })?;
 
-        if let Err(e) = rev_res {
-            error!(target: "serve::wiki_repo", error = %e, "Failed to insert update wiki revision");
+                tx.commit().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to commit wiki article update");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to commit transaction")
+                })?;
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let mut tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to begin transaction")
+                })?;
+
+                sqlx::query(
+                    "UPDATE wiki_articles
+                     SET title = $1, summary = $2, content = $3, latitude = $4, longitude = $5,
+                         zoom = $6, category = $7, tags = $8, geojson = $9, updated_at = $10
+                     WHERE id = $11",
+                )
+                .bind(&article.title)
+                .bind(article.summary.as_deref())
+                .bind(&article.content)
+                .bind(article.latitude)
+                .bind(article.longitude)
+                .bind(article.zoom)
+                .bind(&article.category)
+                .bind(&tags_json)
+                .bind(article.geojson.as_deref())
+                .bind(article.updated_at)
+                .bind(article.id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to update wiki article");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to update wiki article")
+                })?;
+
+                sqlx::query(
+                    "INSERT INTO wiki_revisions (id, article_id, user_id, title, content, latitude, longitude, edit_summary, author, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                )
+                .bind(revision.id)
+                .bind(revision.article_id)
+                .bind(revision.user_id)
+                .bind(&revision.title)
+                .bind(&revision.content)
+                .bind(revision.latitude)
+                .bind(revision.longitude)
+                .bind(revision.edit_summary.as_deref())
+                .bind(&revision.author)
+                .bind(revision.created_at)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to insert update wiki revision");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to insert update revision")
+                })?;
+
+                tx.commit().await.map_err(|e| {
+                    error!(target: "serve::wiki_repo", error = %e, "Failed to commit wiki article update");
+                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to commit transaction")
+                })?;
+            }
         }
 
         Ok(article.clone())

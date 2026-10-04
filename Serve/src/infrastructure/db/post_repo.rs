@@ -1,4 +1,4 @@
-use super::database::Database;
+use super::database::{Database, DatabaseBackend};
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::{
     Comment, Post, PostAnalytics, PostAudience, PostMedia, User, UserList,
@@ -185,29 +185,349 @@ impl PostRepository for Database {
         content: String,
         audience: Option<PostAudience>,
     ) -> Result<Post, DomainError> {
-        let id = Uuid::new_v4();
+        self.create_post_with_details(author_id, content, audience, Vec::new(), None)
+            .await
+    }
+
+    async fn create_post_with_details(
+        &self,
+        author_id: Uuid,
+        content: String,
+        audience: Option<PostAudience>,
+        mut media: Vec<PostMedia>,
+        poll: Option<(String, Vec<String>, i64)>,
+    ) -> Result<Post, DomainError> {
+        let post_id = Uuid::new_v4();
         let aud = audience.unwrap_or(PostAudience::Public);
         let now = Utc::now();
 
-        db_execute!(
-            self,
-            "INSERT INTO posts (id, author_id, content, quote_post_id, pinned_comment_id, audience, views_count, created_at)
-             VALUES ($1, $2, $3, NULL, NULL, $4, 0, $5)",
-            id,
-            author_id,
-            &content,
-            aud.as_str(),
-            now
-        )
-        .map_err(|e| {
-            error!(target: "serve::db", error = %e, "Failed to create post");
-            DomainError::new(ErrorCode::PostCreateFailed, "Failed to create post")
-        })?;
+        for m in &mut media {
+            m.post_id = post_id;
+        }
 
-        self.index_post_content(id, &content).await;
+        match self.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let mut tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to begin transaction");
+                    DomainError::new(ErrorCode::PostCreateFailed, "Failed to begin transaction")
+                })?;
+
+                // 1. Insert post
+                sqlx::query(
+                    "INSERT INTO posts (id, author_id, content, quote_post_id, pinned_comment_id, audience, views_count, created_at)
+                     VALUES ($1, $2, $3, NULL, NULL, $4, 0, $5)",
+                )
+                .bind(post_id)
+                .bind(author_id)
+                .bind(&content)
+                .bind(aud.as_str())
+                .bind(now)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to create post");
+                    DomainError::new(ErrorCode::PostCreateFailed, "Failed to create post")
+                })?;
+
+                // 2. Insert media attachments
+                for m in &media {
+                    sqlx::query(
+                        "INSERT INTO post_media (id, post_id, media_url, media_type, alt_text, sort_order, width, height, created_at)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                    )
+                    .bind(m.id)
+                    .bind(m.post_id)
+                    .bind(&m.media_url)
+                    .bind(m.media_type.as_str())
+                    .bind(&m.alt_text)
+                    .bind(m.sort_order)
+                    .bind(m.width)
+                    .bind(m.height)
+                    .bind(m.created_at)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        error!(target: "serve::db", error = %e, "Failed to insert post media");
+                        DomainError::new(ErrorCode::PostCreateFailed, "Failed to save post media")
+                    })?;
+                }
+
+                // 3. Insert poll if present
+                if let Some((question, options, duration_secs)) = poll {
+                    let poll_id = Uuid::new_v4();
+                    let expires_at = now + chrono::Duration::seconds(duration_secs);
+
+                    sqlx::query(
+                        "INSERT INTO polls (id, post_id, question, expires_at, created_at) VALUES ($1, $2, $3, $4, $5)",
+                    )
+                    .bind(poll_id)
+                    .bind(post_id)
+                    .bind(&question)
+                    .bind(expires_at)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        error!(target: "serve::db", error = %e, "Failed to create poll");
+                        DomainError::new(ErrorCode::PollInvalidOptions, "Failed to create poll")
+                    })?;
+
+                    for (idx, opt_text) in options.iter().enumerate() {
+                        let opt_id = Uuid::new_v4();
+                        sqlx::query(
+                            "INSERT INTO poll_options (id, poll_id, option_text, sort_order) VALUES ($1, $2, $3, $4)",
+                        )
+                        .bind(opt_id)
+                        .bind(poll_id)
+                        .bind(opt_text)
+                        .bind(idx as i32)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(|e| {
+                            error!(target: "serve::db", error = %e, "Failed to insert poll option");
+                            DomainError::new(ErrorCode::PollInvalidOptions, "Failed to create poll option")
+                        })?;
+                    }
+                }
+
+                // 4. Index hashtags
+                for word in content.split_whitespace() {
+                    if let Some(tag) = word.strip_prefix('#') {
+                        let clean_tag: String = tag
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !clean_tag.is_empty() {
+                            let tag_lower = clean_tag.to_lowercase();
+                            let h_id = Uuid::new_v4();
+                            sqlx::query(
+                                "INSERT INTO hashtags (id, name, posts_count, created_at)
+                                 VALUES ($1, $2, 1, $3)
+                                 ON CONFLICT (name) DO UPDATE SET posts_count = hashtags.posts_count + 1",
+                            )
+                            .bind(h_id)
+                            .bind(&tag_lower)
+                            .bind(now)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(|e| {
+                                error!(target: "serve::db", error = %e, "Failed to index hashtag");
+                                DomainError::new(ErrorCode::PostCreateFailed, "Failed to index hashtag")
+                            })?;
+
+                            sqlx::query(
+                                "INSERT INTO post_hashtags (post_id, hashtag_id, created_at)
+                                 SELECT $1, id, $2 FROM hashtags WHERE name = $3
+                                 ON CONFLICT DO NOTHING",
+                            )
+                            .bind(post_id)
+                            .bind(now)
+                            .bind(&tag_lower)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(|e| {
+                                error!(target: "serve::db", error = %e, "Failed to link post hashtag");
+                                DomainError::new(ErrorCode::PostCreateFailed, "Failed to link post hashtag")
+                            })?;
+                        }
+                    }
+                }
+
+                // 5. Index user mentions
+                for word in content.split_whitespace() {
+                    if let Some(handle) = word.strip_prefix('@') {
+                        let clean_handle: String = handle
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !clean_handle.is_empty() {
+                            let handle_lower = clean_handle.to_lowercase();
+                            sqlx::query(
+                                "INSERT INTO user_mentions (post_id, user_id, created_at)
+                                 SELECT $1, id, $2 FROM users WHERE LOWER(username) = $3
+                                 ON CONFLICT DO NOTHING",
+                            )
+                            .bind(post_id)
+                            .bind(now)
+                            .bind(&handle_lower)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(|e| {
+                                error!(target: "serve::db", error = %e, "Failed to index user mention");
+                                DomainError::new(ErrorCode::PostCreateFailed, "Failed to index mention")
+                            })?;
+                        }
+                    }
+                }
+
+                tx.commit().await.map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to commit post creation transaction");
+                    DomainError::new(ErrorCode::PostCreateFailed, "Failed to commit transaction")
+                })?;
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let mut tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to begin transaction");
+                    DomainError::new(ErrorCode::PostCreateFailed, "Failed to begin transaction")
+                })?;
+
+                // 1. Insert post
+                sqlx::query(
+                    "INSERT INTO posts (id, author_id, content, quote_post_id, pinned_comment_id, audience, views_count, created_at)
+                     VALUES ($1, $2, $3, NULL, NULL, $4, 0, $5)",
+                )
+                .bind(post_id)
+                .bind(author_id)
+                .bind(&content)
+                .bind(aud.as_str())
+                .bind(now)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to create post");
+                    DomainError::new(ErrorCode::PostCreateFailed, "Failed to create post")
+                })?;
+
+                // 2. Insert media attachments
+                for m in &media {
+                    sqlx::query(
+                        "INSERT INTO post_media (id, post_id, media_url, media_type, alt_text, sort_order, width, height, created_at)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                    )
+                    .bind(m.id)
+                    .bind(m.post_id)
+                    .bind(&m.media_url)
+                    .bind(m.media_type.as_str())
+                    .bind(&m.alt_text)
+                    .bind(m.sort_order)
+                    .bind(m.width)
+                    .bind(m.height)
+                    .bind(m.created_at)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        error!(target: "serve::db", error = %e, "Failed to insert post media");
+                        DomainError::new(ErrorCode::PostCreateFailed, "Failed to save post media")
+                    })?;
+                }
+
+                // 3. Insert poll if present
+                if let Some((question, options, duration_secs)) = poll {
+                    let poll_id = Uuid::new_v4();
+                    let expires_at = now + chrono::Duration::seconds(duration_secs);
+
+                    sqlx::query(
+                        "INSERT INTO polls (id, post_id, question, expires_at, created_at) VALUES ($1, $2, $3, $4, $5)",
+                    )
+                    .bind(poll_id)
+                    .bind(post_id)
+                    .bind(&question)
+                    .bind(expires_at)
+                    .bind(now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        error!(target: "serve::db", error = %e, "Failed to create poll");
+                        DomainError::new(ErrorCode::PollInvalidOptions, "Failed to create poll")
+                    })?;
+
+                    for (idx, opt_text) in options.iter().enumerate() {
+                        let opt_id = Uuid::new_v4();
+                        sqlx::query(
+                            "INSERT INTO poll_options (id, poll_id, option_text, sort_order) VALUES ($1, $2, $3, $4)",
+                        )
+                        .bind(opt_id)
+                        .bind(poll_id)
+                        .bind(opt_text)
+                        .bind(idx as i32)
+                        .execute(&mut *tx)
+                        .await
+                        .map_err(|e| {
+                            error!(target: "serve::db", error = %e, "Failed to insert poll option");
+                            DomainError::new(ErrorCode::PollInvalidOptions, "Failed to create poll option")
+                        })?;
+                    }
+                }
+
+                // 4. Index hashtags
+                for word in content.split_whitespace() {
+                    if let Some(tag) = word.strip_prefix('#') {
+                        let clean_tag: String = tag
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !clean_tag.is_empty() {
+                            let tag_lower = clean_tag.to_lowercase();
+                            let h_id = Uuid::new_v4();
+                            sqlx::query(
+                                "INSERT INTO hashtags (id, name, posts_count, created_at)
+                                 VALUES ($1, $2, 1, $3)
+                                 ON CONFLICT (name) DO UPDATE SET posts_count = hashtags.posts_count + 1",
+                            )
+                            .bind(h_id)
+                            .bind(&tag_lower)
+                            .bind(now)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(|e| {
+                                error!(target: "serve::db", error = %e, "Failed to index hashtag");
+                                DomainError::new(ErrorCode::PostCreateFailed, "Failed to index hashtag")
+                            })?;
+
+                            sqlx::query(
+                                "INSERT INTO post_hashtags (post_id, hashtag_id, created_at)
+                                 SELECT $1, id, $2 FROM hashtags WHERE name = $3
+                                 ON CONFLICT DO NOTHING",
+                            )
+                            .bind(post_id)
+                            .bind(now)
+                            .bind(&tag_lower)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(|e| {
+                                error!(target: "serve::db", error = %e, "Failed to link post hashtag");
+                                DomainError::new(ErrorCode::PostCreateFailed, "Failed to link post hashtag")
+                            })?;
+                        }
+                    }
+                }
+
+                // 5. Index user mentions
+                for word in content.split_whitespace() {
+                    if let Some(handle) = word.strip_prefix('@') {
+                        let clean_handle: String = handle
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !clean_handle.is_empty() {
+                            let handle_lower = clean_handle.to_lowercase();
+                            sqlx::query(
+                                "INSERT INTO user_mentions (post_id, user_id, created_at)
+                                 SELECT $1, id, $2 FROM users WHERE LOWER(username) = $3
+                                 ON CONFLICT DO NOTHING",
+                            )
+                            .bind(post_id)
+                            .bind(now)
+                            .bind(&handle_lower)
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(|e| {
+                                error!(target: "serve::db", error = %e, "Failed to index user mention");
+                                DomainError::new(ErrorCode::PostCreateFailed, "Failed to index mention")
+                            })?;
+                        }
+                    }
+                }
+
+                tx.commit().await.map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to commit post creation transaction");
+                    DomainError::new(ErrorCode::PostCreateFailed, "Failed to commit transaction")
+                })?;
+            }
+        }
 
         Ok(Post {
-            id,
+            id: post_id,
             author_id,
             content,
             quote_post_id: None,

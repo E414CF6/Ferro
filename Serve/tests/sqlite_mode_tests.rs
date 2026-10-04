@@ -1,4 +1,5 @@
 use async_graphql::Request;
+use chrono::Utc;
 use serve::domain::models::*;
 use serve::domain::repositories::*;
 use serve::graphql::build_schema;
@@ -484,6 +485,102 @@ async fn test_social_relations_dataloader_batching() {
         assert_eq!(u["isMutedByMe"], false);
         assert_eq!(u["hasPendingFollowRequest"], false);
     }
+
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+}
+
+#[tokio::test]
+async fn test_post_creation_transaction_atomicity() {
+    let test_file = format!("./data/test_post_tx_{}.db", Uuid::new_v4());
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+
+    let config = DatabaseConfig::sqlite_mode(&test_file);
+    let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
+
+    let author = db
+        .register_user(
+            "tx_author".to_string(),
+            "tx_author@example.com".to_string(),
+            "hash".to_string(),
+            "Tx Author".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    let media_id = Uuid::new_v4();
+    let media_item = PostMedia {
+        id: media_id,
+        post_id: Uuid::nil(),
+        media_url: "https://example.com/img1.png".to_string(),
+        media_type: MediaType::Image,
+        alt_text: Some("Image 1".to_string()),
+        sort_order: 0,
+        width: Some(800),
+        height: Some(600),
+        created_at: Utc::now(),
+    };
+
+    // 1. Success case: create post with media and poll atomically
+    let created_post = db
+        .create_post_with_details(
+            author.id,
+            "Transactional post with #atomicity and #reliability".to_string(),
+            Some(PostAudience::Public),
+            vec![media_item.clone()],
+            Some((
+                "Poll question?".to_string(),
+                vec!["Yes".to_string(), "No".to_string()],
+                3600,
+            )),
+        )
+        .await
+        .expect("Post creation with details should succeed");
+
+    // Verify all parts exist: post, media, poll
+    let post_in_db = db.get_post_by_id(created_post.id).await;
+    assert!(post_in_db.is_some());
+    let media_in_db = db.get_post_media(created_post.id).await;
+    assert_eq!(media_in_db.len(), 1);
+    let poll_in_db = db.get_poll_by_post_id(created_post.id).await;
+    assert!(poll_in_db.is_some());
+
+    // 2. Rollback case: pass duplicate media IDs in media list (PK conflict on post_media)
+    let dup_media_id = Uuid::new_v4();
+    let mut dup_media_item1 = media_item.clone();
+    dup_media_item1.id = dup_media_id;
+    let mut dup_media_item2 = media_item.clone();
+    dup_media_item2.id = dup_media_id; // Same ID! Will cause constraint error on post_media insert
+
+    let fail_res = db
+        .create_post_with_details(
+            author.id,
+            "This post should be completely rolled back".to_string(),
+            Some(PostAudience::Public),
+            vec![dup_media_item1, dup_media_item2],
+            None,
+        )
+        .await;
+
+    assert!(
+        fail_res.is_err(),
+        "Duplicate media item ID should trigger transaction rollback"
+    );
+
+    // Verify rollback: search for content of failed post
+    let search_results = db.search_posts("rolled back").await;
+    assert!(
+        search_results.is_empty(),
+        "Post should have been rolled back completely!"
+    );
 
     let _ = std::fs::remove_file(&test_file);
     let _ = std::fs::remove_file(format!("{}-shm", &test_file));
