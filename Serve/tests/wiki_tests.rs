@@ -15,8 +15,8 @@ use uuid::Uuid;
 async fn test_wiki_graphql_crud_and_slug_generation() {
     let test_file = format!("./data/test_wiki_db_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
     let db = Database::connect(&config)
@@ -233,16 +233,16 @@ async fn test_wiki_graphql_crud_and_slug_generation() {
     assert!(res_verify.data.into_json().unwrap()["article"].is_null());
 
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
 
 #[tokio::test]
 async fn test_wiki_authenticated_creation_and_seeding() {
     let test_file = format!("./data/test_wiki_seed_db_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
     let db = Database::connect(&config)
@@ -328,16 +328,16 @@ async fn test_wiki_authenticated_creation_and_seeding() {
 
     // Clean up
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
 
 #[tokio::test]
 async fn test_wiki_article_transaction_atomicity() {
     let test_file = format!("./data/test_wiki_tx_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
     let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
@@ -417,6 +417,6 @@ async fn test_wiki_article_transaction_atomicity() {
     );
 
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }

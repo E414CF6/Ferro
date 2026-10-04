@@ -413,7 +413,7 @@ impl<R: WikiRepository> WikiService<R> {
             .iter()
             .map(|s| (s.article.id, s.past_score))
             .collect();
-        past_rank_list.sort_by(|a, b| b.1.cmp(&a.1));
+        past_rank_list.sort_by_key(|a| std::cmp::Reverse(a.1));
         let past_rank_map: HashMap<Uuid, i32> = past_rank_list
             .into_iter()
             .enumerate()
@@ -494,7 +494,7 @@ impl<R: WikiRepository> WikiService<R> {
 
         // Past tag ranks
         let mut past_tags: Vec<(String, i64)> = tag_past.into_iter().collect();
-        past_tags.sort_by(|a, b| b.1.cmp(&a.1));
+        past_tags.sort_by_key(|a| std::cmp::Reverse(a.1));
         let past_tag_rank_map: HashMap<String, i32> = past_tags
             .into_iter()
             .enumerate()

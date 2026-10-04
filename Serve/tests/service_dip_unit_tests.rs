@@ -171,7 +171,7 @@ async fn test_comment_service_with_mock_repository_creation() {
     assert!(result.is_ok());
     let comment = result.unwrap();
     assert_eq!(comment.content, "Hello Ferro architecture!");
-    assert_eq!(comment.is_edited, false);
+    assert!(!comment.is_edited);
 
     // 2. Validation failure: empty content
     let empty_result = service

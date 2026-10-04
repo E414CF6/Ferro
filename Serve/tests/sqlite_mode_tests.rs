@@ -15,8 +15,8 @@ use uuid::Uuid;
 async fn test_sqlite_database_mode_crud_and_persistence() {
     let test_file = format!("./data/test_sqlite_db_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     // 1. Connect to SQLite Database
     let config = DatabaseConfig::sqlite_mode(&test_file);
@@ -229,16 +229,16 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
 
     // Clean up
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
 
 #[tokio::test]
 async fn test_sqlite_database_graphql_queries_and_dataloaders() {
     let test_file = format!("./data/test_gql_sqlite_db_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
     let db = Database::connect(&config)
@@ -347,16 +347,16 @@ async fn test_sqlite_database_graphql_queries_and_dataloaders() {
 
     // Clean up
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
 
 #[tokio::test]
 async fn test_social_relations_dataloader_batching() {
     let test_file = format!("./data/test_social_loader_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
     let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
@@ -487,16 +487,16 @@ async fn test_social_relations_dataloader_batching() {
     }
 
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
 
 #[tokio::test]
 async fn test_post_creation_transaction_atomicity() {
     let test_file = format!("./data/test_post_tx_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
     let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
@@ -583,6 +583,6 @@ async fn test_post_creation_transaction_atomicity() {
     );
 
     let _ = std::fs::remove_file(&test_file);
-    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
-    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+    let _ = std::fs::remove_file(format!("{}-shm", test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
