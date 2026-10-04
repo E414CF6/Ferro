@@ -84,10 +84,58 @@ pub async fn graphql_handler(
 
 pub async fn graphql_ws_handler(
     Extension(schema): Extension<SnsSchema>,
+    Extension(config): Extension<AppConfig>,
+    headers: HeaderMap,
     protocol: GraphQLProtocol,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    upgrade.on_upgrade(move |socket| GraphQLWebSocket::new(socket, schema, protocol).serve())
+    let mut initial_data = async_graphql::Data::default();
+    if let Some(auth_header) = headers.get("Authorization").and_then(|h| h.to_str().ok()) {
+        let auth_str = auth_header.trim();
+        if let Some(token) = auth_str
+            .strip_prefix("Bearer ")
+            .or_else(|| auth_str.strip_prefix("bearer "))
+        {
+            if let Ok(auth_user) = verify_jwt(token.trim(), &config.auth.jwt_secret) {
+                initial_data.insert(auth_user);
+            }
+        }
+    }
+
+    let jwt_secret = config.auth.jwt_secret.clone();
+
+    upgrade.on_upgrade(move |socket| {
+        GraphQLWebSocket::new(socket, schema, protocol)
+            .with_data(initial_data)
+            .on_connection_init(move |value| {
+                let secret = jwt_secret.clone();
+                async move {
+                    let mut data = async_graphql::Data::default();
+                    if let Some(token_val) = value
+                        .get("Authorization")
+                        .or_else(|| value.get("authorization"))
+                        .or_else(|| value.get("token"))
+                        .and_then(|v| v.as_str())
+                    {
+                        let token = token_val.trim();
+                        let token = token
+                            .strip_prefix("Bearer ")
+                            .or_else(|| token.strip_prefix("bearer "))
+                            .unwrap_or(token);
+                        match verify_jwt(token.trim(), &secret) {
+                            Ok(auth_user) => {
+                                data.insert(auth_user);
+                            }
+                            Err(e) => {
+                                return Err(async_graphql::Error::new(e.to_string()));
+                            }
+                        }
+                    }
+                    Ok(data)
+                }
+            })
+            .serve()
+    })
 }
 
 pub async fn graphiql_handler(Extension(config): Extension<AppConfig>) -> impl IntoResponse {

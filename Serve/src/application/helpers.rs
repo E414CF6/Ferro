@@ -10,7 +10,27 @@ pub fn resolve_user_id(
     ctx: &Context<'_>,
     explicit_id: Option<ID>,
 ) -> Result<Uuid, async_graphql::Error> {
-    if let Some(id_str) = explicit_id {
+    if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
+        if let Some(id_str) = explicit_id {
+            let parsed_id = Uuid::parse_str(&id_str).map_err(|_| {
+                DomainError::new(
+                    ErrorCode::ErrorBadRequest,
+                    ErrorCode::ErrorBadRequest.as_str(),
+                )
+                .extend()
+            })?;
+            if auth_user.user_id != parsed_id {
+                return Err(DomainError::new(
+                    ErrorCode::ErrorForbidden,
+                    ErrorCode::ErrorForbidden.as_str(),
+                )
+                .extend());
+            }
+            Ok(parsed_id)
+        } else {
+            Ok(auth_user.user_id)
+        }
+    } else if let Some(id_str) = explicit_id {
         Uuid::parse_str(&id_str).map_err(|_| {
             DomainError::new(
                 ErrorCode::ErrorBadRequest,
@@ -18,8 +38,6 @@ pub fn resolve_user_id(
             )
             .extend()
         })
-    } else if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
-        Ok(auth_user.user_id)
     } else {
         Err(DomainError::new(
             ErrorCode::AuthUserIdOrTokenRequired,
