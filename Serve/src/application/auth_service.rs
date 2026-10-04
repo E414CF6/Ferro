@@ -1,19 +1,20 @@
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::User;
-use crate::domain::repositories::AppRepository;
+use crate::domain::repositories::UserRepository;
 use crate::infrastructure::auth::{create_jwt, hash_password, verify_password};
 use crate::infrastructure::config::AuthConfig;
+use crate::infrastructure::db::database::Database;
 
 use std::sync::Arc;
 use tracing::{info, warn};
 
 #[derive(Clone)]
-pub struct AuthService<R: AppRepository> {
+pub struct AuthService<R: UserRepository = Database> {
     repository: Arc<R>,
     auth_config: AuthConfig,
 }
 
-impl<R: AppRepository> AuthService<R> {
+impl<R: UserRepository> AuthService<R> {
     pub fn new(repository: Arc<R>, auth_config: AuthConfig) -> Self {
         Self {
             repository,

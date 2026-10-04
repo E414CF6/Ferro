@@ -22,6 +22,7 @@ pub use wiki::WikiRepository;
 
 /// Unified repository super-trait combining all domain sub-repositories.
 /// Any type implementing all sub-traits automatically implements `AppRepository`.
+#[allow(dead_code)]
 pub trait AppRepository:
     UserRepository
     + PostRepository
