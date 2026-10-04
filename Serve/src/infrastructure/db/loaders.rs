@@ -958,3 +958,308 @@ impl Loader<Uuid> for WikiRevisionsLoader {
     }
 }
 
+/// Batch loads follow relationships (follower_id, followee_id) -> bool
+pub struct IsFollowingLoader {
+    db: Database,
+}
+
+impl IsFollowingLoader {
+    pub fn new(db: Database) -> Self {
+        Self { db }
+    }
+}
+
+impl Loader<(Uuid, Uuid)> for IsFollowingLoader {
+    type Value = bool;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(
+        &self,
+        keys: &[(Uuid, Uuid)],
+    ) -> Result<HashMap<(Uuid, Uuid), Self::Value>, Self::Error> {
+        if keys.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut map: HashMap<(Uuid, Uuid), bool> = keys.iter().map(|k| (*k, false)).collect();
+
+        let mut followers: Vec<Uuid> = keys.iter().map(|(f, _)| *f).collect();
+        followers.sort_unstable();
+        followers.dedup();
+
+        let mut followees: Vec<Uuid> = keys.iter().map(|(_, f)| *f).collect();
+        followees.sort_unstable();
+        followees.dedup();
+
+        match self.db.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let rows = sqlx::query(
+                    "SELECT follower_id, followee_id FROM follows WHERE follower_id = ANY($1) AND followee_id = ANY($2)",
+                )
+                .bind(&followers)
+                .bind(&followees)
+                .fetch_all(pool)
+                .await
+                .map_err(Arc::new)?;
+
+                for row in rows {
+                    let f: Uuid = row.try_get("follower_id").map_err(Arc::new)?;
+                    let fe: Uuid = row.try_get("followee_id").map_err(Arc::new)?;
+                    map.insert((f, fe), true);
+                }
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let p1 = vec!["?"; followers.len()].join(",");
+                let p2 = vec!["?"; followees.len()].join(",");
+                let sql = format!(
+                    "SELECT follower_id, followee_id FROM follows WHERE follower_id IN ({p1}) AND followee_id IN ({p2})",
+                );
+                let mut query = sqlx::query(AssertSqlSafe(sql.as_str()));
+                for f in &followers {
+                    query = query.bind(f);
+                }
+                for fe in &followees {
+                    query = query.bind(fe);
+                }
+                let rows = query.fetch_all(pool).await.map_err(Arc::new)?;
+                for row in rows {
+                    let f: Uuid = row.try_get("follower_id").map_err(Arc::new)?;
+                    let fe: Uuid = row.try_get("followee_id").map_err(Arc::new)?;
+                    map.insert((f, fe), true);
+                }
+            }
+        }
+
+        Ok(map)
+    }
+}
+
+/// Batch loads block relationships (blocker_id, blocked_id) -> bool
+pub struct IsBlockedLoader {
+    db: Database,
+}
+
+impl IsBlockedLoader {
+    pub fn new(db: Database) -> Self {
+        Self { db }
+    }
+}
+
+impl Loader<(Uuid, Uuid)> for IsBlockedLoader {
+    type Value = bool;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(
+        &self,
+        keys: &[(Uuid, Uuid)],
+    ) -> Result<HashMap<(Uuid, Uuid), Self::Value>, Self::Error> {
+        if keys.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut map: HashMap<(Uuid, Uuid), bool> = keys.iter().map(|k| (*k, false)).collect();
+
+        let mut blockers: Vec<Uuid> = keys.iter().map(|(b, _)| *b).collect();
+        blockers.sort_unstable();
+        blockers.dedup();
+
+        let mut blockeds: Vec<Uuid> = keys.iter().map(|(_, b)| *b).collect();
+        blockeds.sort_unstable();
+        blockeds.dedup();
+
+        match self.db.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let rows = sqlx::query(
+                    "SELECT blocker_id, blocked_id FROM blocks WHERE blocker_id = ANY($1) AND blocked_id = ANY($2)",
+                )
+                .bind(&blockers)
+                .bind(&blockeds)
+                .fetch_all(pool)
+                .await
+                .map_err(Arc::new)?;
+
+                for row in rows {
+                    let b: Uuid = row.try_get("blocker_id").map_err(Arc::new)?;
+                    let bd: Uuid = row.try_get("blocked_id").map_err(Arc::new)?;
+                    map.insert((b, bd), true);
+                }
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let p1 = vec!["?"; blockers.len()].join(",");
+                let p2 = vec!["?"; blockeds.len()].join(",");
+                let sql = format!(
+                    "SELECT blocker_id, blocked_id FROM blocks WHERE blocker_id IN ({p1}) AND blocked_id IN ({p2})",
+                );
+                let mut query = sqlx::query(AssertSqlSafe(sql.as_str()));
+                for b in &blockers {
+                    query = query.bind(b);
+                }
+                for bd in &blockeds {
+                    query = query.bind(bd);
+                }
+                let rows = query.fetch_all(pool).await.map_err(Arc::new)?;
+                for row in rows {
+                    let b: Uuid = row.try_get("blocker_id").map_err(Arc::new)?;
+                    let bd: Uuid = row.try_get("blocked_id").map_err(Arc::new)?;
+                    map.insert((b, bd), true);
+                }
+            }
+        }
+
+        Ok(map)
+    }
+}
+
+/// Batch loads mute relationships (muter_id, muted_id) -> bool
+pub struct IsMutedLoader {
+    db: Database,
+}
+
+impl IsMutedLoader {
+    pub fn new(db: Database) -> Self {
+        Self { db }
+    }
+}
+
+impl Loader<(Uuid, Uuid)> for IsMutedLoader {
+    type Value = bool;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(
+        &self,
+        keys: &[(Uuid, Uuid)],
+    ) -> Result<HashMap<(Uuid, Uuid), Self::Value>, Self::Error> {
+        if keys.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut map: HashMap<(Uuid, Uuid), bool> = keys.iter().map(|k| (*k, false)).collect();
+
+        let mut muters: Vec<Uuid> = keys.iter().map(|(m, _)| *m).collect();
+        muters.sort_unstable();
+        muters.dedup();
+
+        let mut muteds: Vec<Uuid> = keys.iter().map(|(_, m)| *m).collect();
+        muteds.sort_unstable();
+        muteds.dedup();
+
+        match self.db.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let rows = sqlx::query(
+                    "SELECT muter_id, muted_id FROM mutes WHERE muter_id = ANY($1) AND muted_id = ANY($2)",
+                )
+                .bind(&muters)
+                .bind(&muteds)
+                .fetch_all(pool)
+                .await
+                .map_err(Arc::new)?;
+
+                for row in rows {
+                    let m: Uuid = row.try_get("muter_id").map_err(Arc::new)?;
+                    let md: Uuid = row.try_get("muted_id").map_err(Arc::new)?;
+                    map.insert((m, md), true);
+                }
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let p1 = vec!["?"; muters.len()].join(",");
+                let p2 = vec!["?"; muteds.len()].join(",");
+                let sql = format!(
+                    "SELECT muter_id, muted_id FROM mutes WHERE muter_id IN ({p1}) AND muted_id IN ({p2})",
+                );
+                let mut query = sqlx::query(AssertSqlSafe(sql.as_str()));
+                for m in &muters {
+                    query = query.bind(m);
+                }
+                for md in &muteds {
+                    query = query.bind(md);
+                }
+                let rows = query.fetch_all(pool).await.map_err(Arc::new)?;
+                for row in rows {
+                    let m: Uuid = row.try_get("muter_id").map_err(Arc::new)?;
+                    let md: Uuid = row.try_get("muted_id").map_err(Arc::new)?;
+                    map.insert((m, md), true);
+                }
+            }
+        }
+
+        Ok(map)
+    }
+}
+
+/// Batch loads pending follow requests (requester_id, target_id) -> bool
+pub struct HasPendingFollowRequestLoader {
+    db: Database,
+}
+
+impl HasPendingFollowRequestLoader {
+    pub fn new(db: Database) -> Self {
+        Self { db }
+    }
+}
+
+impl Loader<(Uuid, Uuid)> for HasPendingFollowRequestLoader {
+    type Value = bool;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(
+        &self,
+        keys: &[(Uuid, Uuid)],
+    ) -> Result<HashMap<(Uuid, Uuid), Self::Value>, Self::Error> {
+        if keys.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut map: HashMap<(Uuid, Uuid), bool> = keys.iter().map(|k| (*k, false)).collect();
+
+        let mut requesters: Vec<Uuid> = keys.iter().map(|(r, _)| *r).collect();
+        requesters.sort_unstable();
+        requesters.dedup();
+
+        let mut targets: Vec<Uuid> = keys.iter().map(|(_, t)| *t).collect();
+        targets.sort_unstable();
+        targets.dedup();
+
+        match self.db.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                let rows = sqlx::query(
+                    "SELECT requester_id, target_id FROM follow_requests WHERE requester_id = ANY($1) AND target_id = ANY($2) AND status = 'PENDING'",
+                )
+                .bind(&requesters)
+                .bind(&targets)
+                .fetch_all(pool)
+                .await
+                .map_err(Arc::new)?;
+
+                for row in rows {
+                    let r: Uuid = row.try_get("requester_id").map_err(Arc::new)?;
+                    let t: Uuid = row.try_get("target_id").map_err(Arc::new)?;
+                    map.insert((r, t), true);
+                }
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let p1 = vec!["?"; requesters.len()].join(",");
+                let p2 = vec!["?"; targets.len()].join(",");
+                let sql = format!(
+                    "SELECT requester_id, target_id FROM follow_requests WHERE requester_id IN ({p1}) AND target_id IN ({p2}) AND status = 'PENDING'",
+                );
+                let mut query = sqlx::query(AssertSqlSafe(sql.as_str()));
+                for r in &requesters {
+                    query = query.bind(r);
+                }
+                for t in &targets {
+                    query = query.bind(t);
+                }
+                let rows = query.fetch_all(pool).await.map_err(Arc::new)?;
+                for row in rows {
+                    let r: Uuid = row.try_get("requester_id").map_err(Arc::new)?;
+                    let t: Uuid = row.try_get("target_id").map_err(Arc::new)?;
+                    map.insert((r, t), true);
+                }
+            }
+        }
+
+        Ok(map)
+    }
+}
+
+

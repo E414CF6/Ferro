@@ -7,7 +7,8 @@ use crate::application::AppServices;
 use crate::infrastructure::config::AuthConfig;
 use crate::infrastructure::db::loaders::{
     CommentLikesCountLoader, CommentLoader, CommentRepliesCountLoader, FollowersCountLoader,
-    FollowingCountLoader, HasActiveStoriesLoader, PollOptionVotesCountLoader, PollOptionsLoader,
+    FollowingCountLoader, HasActiveStoriesLoader, HasPendingFollowRequestLoader, IsBlockedLoader,
+    IsFollowingLoader, IsMutedLoader, PollOptionVotesCountLoader, PollOptionsLoader,
     PostLikesCountLoader, PostLoader, PostMediaLoader, PostPollLoader, PostRepostsCountLoader,
     UserLoader, UserPostsCountLoader, WikiRevisionsLoader,
 };
@@ -60,6 +61,14 @@ pub fn build_schema_with_options(
         DataLoader::new(PollOptionVotesCountLoader::new(db.clone()), tokio::spawn);
     let wiki_revisions_loader =
         DataLoader::new(WikiRevisionsLoader::new(db.clone()), tokio::spawn);
+    let is_following_loader =
+        DataLoader::new(IsFollowingLoader::new(db.clone()), tokio::spawn);
+    let is_blocked_loader =
+        DataLoader::new(IsBlockedLoader::new(db.clone()), tokio::spawn);
+    let is_muted_loader =
+        DataLoader::new(IsMutedLoader::new(db.clone()), tokio::spawn);
+    let has_pending_follow_request_loader =
+        DataLoader::new(HasPendingFollowRequestLoader::new(db.clone()), tokio::spawn);
 
     let mut builder = Schema::build(
         QueryRoot::default(),
@@ -99,7 +108,11 @@ pub fn build_schema_with_options(
     .data(post_poll_loader)
     .data(poll_options_loader)
     .data(poll_option_votes_loader)
-    .data(wiki_revisions_loader);
+    .data(wiki_revisions_loader)
+    .data(is_following_loader)
+    .data(is_blocked_loader)
+    .data(is_muted_loader)
+    .data(has_pending_follow_request_loader);
 
     if !enable_introspection {
         builder = builder.disable_introspection();

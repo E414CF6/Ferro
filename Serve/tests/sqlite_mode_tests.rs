@@ -349,3 +349,143 @@ async fn test_sqlite_database_graphql_queries_and_dataloaders() {
     let _ = std::fs::remove_file(format!("{}-shm", &test_file));
     let _ = std::fs::remove_file(format!("{}-wal", &test_file));
 }
+
+#[tokio::test]
+async fn test_social_relations_dataloader_batching() {
+    let test_file = format!("./data/test_social_loader_{}.db", Uuid::new_v4());
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+
+    let config = DatabaseConfig::sqlite_mode(&test_file);
+    let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
+
+    let alice = db
+        .register_user(
+            "alice_social".to_string(),
+            "alice_social@example.com".to_string(),
+            "hash".to_string(),
+            "Alice Social".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    let bob = db
+        .register_user(
+            "bob_social".to_string(),
+            "bob_social@example.com".to_string(),
+            "hash".to_string(),
+            "Bob Social".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    let charlie = db
+        .register_user(
+            "charlie_social".to_string(),
+            "charlie_social@example.com".to_string(),
+            "hash".to_string(),
+            "Charlie Social".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // 1. Set relationships:
+    // Alice follows Bob
+    db.follow_user(alice.id, bob.id).await.unwrap();
+    // Bob blocks Charlie
+    db.block_user(bob.id, charlie.id).await.unwrap();
+    // Alice mutes Charlie
+    db.mute_user(alice.id, charlie.id).await.unwrap();
+    // Charlie sends follow request to Alice
+    db.create_follow_request(charlie.id, alice.id).await.unwrap();
+
+    let broker = MessageBroker::new(16);
+    let schema = build_schema(db, AuthConfig::default(), broker);
+
+    let auth_alice = AuthUser {
+        user_id: alice.id,
+        username: alice.username.clone(),
+    };
+
+    // 2. Alice queries users list with all social relationship fields resolved via DataLoader
+    let query_alice = r#"
+        query {
+            users {
+                id
+                username
+                isFollowedByMe
+                isBlockingMe
+                isBlockedByMe
+                isMutedByMe
+                hasPendingFollowRequest
+            }
+        }
+    "#;
+    let req = Request::new(query_alice).data(auth_alice.clone());
+    let res = schema.execute(req).await;
+    assert!(res.errors.is_empty(), "Alice query failed: {:?}", res.errors);
+
+    let users_json = serde_json::to_value(&res.data).unwrap();
+    let users = users_json["users"].as_array().unwrap();
+
+    let bob_res = users.iter().find(|u| u["username"] == "bob_social").unwrap();
+    assert_eq!(bob_res["isFollowedByMe"], true);
+    assert_eq!(bob_res["isBlockingMe"], false);
+    assert_eq!(bob_res["isBlockedByMe"], false);
+    assert_eq!(bob_res["isMutedByMe"], false);
+
+    let charlie_res = users.iter().find(|u| u["username"] == "charlie_social").unwrap();
+    assert_eq!(charlie_res["isFollowedByMe"], false);
+    assert_eq!(charlie_res["isMutedByMe"], true);
+    assert_eq!(charlie_res["hasPendingFollowRequest"], false);
+
+    // 3. Charlie queries users list:
+    let auth_charlie = AuthUser {
+        user_id: charlie.id,
+        username: charlie.username.clone(),
+    };
+    let req_charlie = Request::new(query_alice).data(auth_charlie);
+    let res_charlie = schema.execute(req_charlie).await;
+    assert!(res_charlie.errors.is_empty(), "Charlie query failed: {:?}", res_charlie.errors);
+
+    let charlie_view = serde_json::to_value(&res_charlie.data).unwrap();
+    let charlie_users = charlie_view["users"].as_array().unwrap();
+
+    let alice_view = charlie_users.iter().find(|u| u["username"] == "alice_social").unwrap();
+    assert_eq!(alice_view["hasPendingFollowRequest"], true);
+
+    let bob_view = charlie_users.iter().find(|u| u["username"] == "bob_social").unwrap();
+    assert_eq!(bob_view["isBlockingMe"], true);
+
+    // 4. Anonymous query returns false for all relation fields
+    let res_anon = schema.execute(Request::new(query_alice)).await;
+    assert!(res_anon.errors.is_empty());
+    let anon_view = serde_json::to_value(&res_anon.data).unwrap();
+    for u in anon_view["users"].as_array().unwrap() {
+        assert_eq!(u["isFollowedByMe"], false);
+        assert_eq!(u["isBlockingMe"], false);
+        assert_eq!(u["isBlockedByMe"], false);
+        assert_eq!(u["isMutedByMe"], false);
+        assert_eq!(u["hasPendingFollowRequest"], false);
+    }
+
+    let _ = std::fs::remove_file(&test_file);
+    let _ = std::fs::remove_file(format!("{}-shm", &test_file));
+    let _ = std::fs::remove_file(format!("{}-wal", &test_file));
+}

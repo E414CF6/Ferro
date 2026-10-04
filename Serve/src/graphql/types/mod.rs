@@ -20,7 +20,8 @@ use crate::domain::repositories::*;
 use crate::infrastructure::auth::AuthUser;
 use crate::infrastructure::db::loaders::{
     CommentLikesCountLoader, CommentLoader, CommentRepliesCountLoader, FollowersCountLoader,
-    FollowingCountLoader, HasActiveStoriesLoader, PollOptionVotesCountLoader, PollOptionsLoader,
+    FollowingCountLoader, HasActiveStoriesLoader, HasPendingFollowRequestLoader, IsBlockedLoader,
+    IsFollowingLoader, IsMutedLoader, PollOptionVotesCountLoader, PollOptionsLoader,
     PostLikesCountLoader, PostLoader, PostMediaLoader, PostPollLoader, PostRepostsCountLoader,
     UserLoader, UserPostsCountLoader,
 };
@@ -213,8 +214,17 @@ impl UserGql {
 
     async fn is_followed_by_me(&self, ctx: &Context<'_>) -> Result<bool> {
         if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
-            let db = ctx.data::<Database>()?;
-            Ok(db.is_following(auth_user.user_id, self.0.id).await)
+            if let Some(loader) = ctx.data_opt::<DataLoader<IsFollowingLoader>>() {
+                let res = loader
+                    .load_one((auth_user.user_id, self.0.id))
+                    .await
+                    .map_err(|e| async_graphql::Error::new(e.to_string()))?
+                    .unwrap_or(false);
+                Ok(res)
+            } else {
+                let db = ctx.data::<Database>()?;
+                Ok(db.is_following(auth_user.user_id, self.0.id).await)
+            }
         } else {
             Ok(false)
         }
@@ -222,8 +232,17 @@ impl UserGql {
 
     async fn is_blocking_me(&self, ctx: &Context<'_>) -> Result<bool> {
         if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
-            let db = ctx.data::<Database>()?;
-            Ok(db.is_blocking(self.0.id, auth_user.user_id).await)
+            if let Some(loader) = ctx.data_opt::<DataLoader<IsBlockedLoader>>() {
+                let res = loader
+                    .load_one((self.0.id, auth_user.user_id))
+                    .await
+                    .map_err(|e| async_graphql::Error::new(e.to_string()))?
+                    .unwrap_or(false);
+                Ok(res)
+            } else {
+                let db = ctx.data::<Database>()?;
+                Ok(db.is_blocking(self.0.id, auth_user.user_id).await)
+            }
         } else {
             Ok(false)
         }
@@ -231,8 +250,17 @@ impl UserGql {
 
     async fn is_blocked_by_me(&self, ctx: &Context<'_>) -> Result<bool> {
         if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
-            let db = ctx.data::<Database>()?;
-            Ok(db.is_blocking(auth_user.user_id, self.0.id).await)
+            if let Some(loader) = ctx.data_opt::<DataLoader<IsBlockedLoader>>() {
+                let res = loader
+                    .load_one((auth_user.user_id, self.0.id))
+                    .await
+                    .map_err(|e| async_graphql::Error::new(e.to_string()))?
+                    .unwrap_or(false);
+                Ok(res)
+            } else {
+                let db = ctx.data::<Database>()?;
+                Ok(db.is_blocking(auth_user.user_id, self.0.id).await)
+            }
         } else {
             Ok(false)
         }
@@ -240,8 +268,17 @@ impl UserGql {
 
     async fn is_muted_by_me(&self, ctx: &Context<'_>) -> Result<bool> {
         if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
-            let db = ctx.data::<Database>()?;
-            Ok(db.is_muting(auth_user.user_id, self.0.id).await)
+            if let Some(loader) = ctx.data_opt::<DataLoader<IsMutedLoader>>() {
+                let res = loader
+                    .load_one((auth_user.user_id, self.0.id))
+                    .await
+                    .map_err(|e| async_graphql::Error::new(e.to_string()))?
+                    .unwrap_or(false);
+                Ok(res)
+            } else {
+                let db = ctx.data::<Database>()?;
+                Ok(db.is_muting(auth_user.user_id, self.0.id).await)
+            }
         } else {
             Ok(false)
         }
@@ -249,10 +286,19 @@ impl UserGql {
 
     async fn has_pending_follow_request(&self, ctx: &Context<'_>) -> Result<bool> {
         if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
-            let db = ctx.data::<Database>()?;
-            Ok(db
-                .has_pending_follow_request(auth_user.user_id, self.0.id)
-                .await)
+            if let Some(loader) = ctx.data_opt::<DataLoader<HasPendingFollowRequestLoader>>() {
+                let res = loader
+                    .load_one((auth_user.user_id, self.0.id))
+                    .await
+                    .map_err(|e| async_graphql::Error::new(e.to_string()))?
+                    .unwrap_or(false);
+                Ok(res)
+            } else {
+                let db = ctx.data::<Database>()?;
+                Ok(db
+                    .has_pending_follow_request(auth_user.user_id, self.0.id)
+                    .await)
+            }
         } else {
             Ok(false)
         }
