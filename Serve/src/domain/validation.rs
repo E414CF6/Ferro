@@ -138,3 +138,44 @@ pub fn validate_dm_content(content: &str) -> Result<String, DomainError> {
     }
     Ok(trimmed.to_string())
 }
+
+pub fn validate_wiki_article(
+    title: &str,
+    content: &str,
+    latitude: f64,
+    longitude: f64,
+    tags: &[String],
+) -> Result<(), DomainError> {
+    let trimmed_title = title.trim();
+    if trimmed_title.is_empty() || trimmed_title.chars().count() > 100 {
+        return Err(DomainError::new(
+            ErrorCode::WikiArticleTitleInvalid,
+            ErrorCode::WikiArticleTitleInvalid.as_str(),
+        ));
+    }
+
+    let trimmed_content = content.trim();
+    if trimmed_content.is_empty() {
+        return Err(DomainError::new(
+            ErrorCode::WikiArticleContentInvalid,
+            ErrorCode::WikiArticleContentInvalid.as_str(),
+        ));
+    }
+
+    if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
+        return Err(DomainError::new(
+            ErrorCode::WikiArticleCoordinatesInvalid,
+            ErrorCode::WikiArticleCoordinatesInvalid.as_str(),
+        ));
+    }
+
+    if tags.len() > 15 {
+        return Err(DomainError::new(
+            ErrorCode::WikiArticleTagsInvalid,
+            ErrorCode::WikiArticleTagsInvalid.as_str(),
+        ));
+    }
+
+    Ok(())
+}
+

@@ -504,3 +504,121 @@ pub struct Notification {
     pub is_read: bool,
     pub created_at: DateTime<Utc>,
 }
+
+// ---------------------------------------------------------------------------
+// Wiki Map (wMap) Domain Models
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WikiArticle {
+    pub id: Uuid,
+    pub user_id: Option<Uuid>,
+    pub title: String,
+    pub slug: String,
+    pub summary: Option<String>,
+    pub content: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub zoom: f64,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub geojson: Option<String>,
+    pub author: String,
+    pub views: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WikiRevision {
+    pub id: Uuid,
+    pub article_id: Uuid,
+    pub user_id: Option<Uuid>,
+    pub title: String,
+    pub content: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub edit_summary: Option<String>,
+    pub author: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WikiViewLog {
+    pub id: Uuid,
+    pub article_id: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, async_graphql::Enum)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RankChangeType {
+    Up,
+    Down,
+    Same,
+    New,
+}
+
+impl RankChangeType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RankChangeType::Up => "UP",
+            RankChangeType::Down => "DOWN",
+            RankChangeType::Same => "SAME",
+            RankChangeType::New => "NEW",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrendingArticleItem {
+    pub rank: i32,
+    pub prev_rank: Option<i32>,
+    pub change: RankChangeType,
+    pub change_amount: Option<i32>,
+    pub id: Uuid,
+    pub title: String,
+    pub slug: String,
+    pub summary: Option<String>,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub zoom: f64,
+    pub category: String,
+    pub tags: Vec<String>,
+    pub views: i64,
+    pub recent_views: i64,
+    pub score: i64,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrendingTagItem {
+    pub rank: i32,
+    pub prev_rank: Option<i32>,
+    pub change: RankChangeType,
+    pub change_amount: Option<i32>,
+    pub tag: String,
+    pub count: i32,
+    pub score: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrendsData {
+    pub articles: Vec<TrendingArticleItem>,
+    pub tags: Vec<TrendingTagItem>,
+    pub updated_at: DateTime<Utc>,
+    pub total_articles: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ArticleFilterParams {
+    pub q: Option<String>,
+    pub tag: Option<String>,
+    pub min_lat: Option<f64>,
+    pub max_lat: Option<f64>,
+    pub min_lng: Option<f64>,
+    pub max_lng: Option<f64>,
+    pub limit: Option<usize>,
+}
+

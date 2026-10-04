@@ -13,6 +13,7 @@ pub mod post_service;
 pub mod social_service;
 pub mod story_service;
 pub mod totp_service;
+pub mod wiki_service;
 
 pub use auth_service::AuthService;
 pub use bookmark_service::BookmarkService;
@@ -25,6 +26,7 @@ pub use poll_service::PollService;
 pub use post_service::PostService;
 pub use social_service::SocialService;
 pub use story_service::StoryService;
+pub use wiki_service::WikiService;
 
 use crate::infrastructure::config::AuthConfig;
 use crate::infrastructure::db::database::Database;
@@ -44,6 +46,7 @@ pub struct AppServices {
     pub poll: PollService,
     pub moderation: ModerationService,
     pub discovery: DiscoveryService,
+    pub wiki: WikiService,
 }
 
 impl AppServices {
@@ -60,7 +63,8 @@ impl AppServices {
             bookmark: BookmarkService::new(db_arc.clone()),
             poll: PollService::new(db_arc.clone()),
             moderation: ModerationService::new(db_arc.clone()),
-            discovery: DiscoveryService::new(db_arc),
+            discovery: DiscoveryService::new(db_arc.clone()),
+            wiki: WikiService::new(db_arc),
         }
     }
 }

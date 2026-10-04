@@ -1,3 +1,7 @@
+pub mod common;
+pub mod wiki;
+pub use wiki::*;
+
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::{
     BookmarkCollection as BookmarkCollectionModel, Comment as CommentModel,

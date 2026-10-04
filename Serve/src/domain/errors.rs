@@ -117,6 +117,16 @@ pub enum ErrorCode {
     StorageDeleteFailed,
     StorageFileNotFound,
 
+    // Wiki Map (wMap)
+    WikiArticleNotFound,
+    WikiArticleTitleInvalid,
+    WikiArticleContentInvalid,
+    WikiArticleCoordinatesInvalid,
+    WikiArticleTagsInvalid,
+    WikiArticleCreateFailed,
+    WikiArticleUpdateFailed,
+    WikiArticleDeleteFailed,
+
     // Security & Limits
     RateLimitExceeded,
 
@@ -228,6 +238,15 @@ impl ErrorCode {
             ErrorCode::StorageUploadFailed => "STORAGE_UPLOAD_FAILED",
             ErrorCode::StorageDeleteFailed => "STORAGE_DELETE_FAILED",
             ErrorCode::StorageFileNotFound => "STORAGE_FILE_NOT_FOUND",
+
+            ErrorCode::WikiArticleNotFound => "WIKI_ARTICLE_NOT_FOUND",
+            ErrorCode::WikiArticleTitleInvalid => "WIKI_ARTICLE_TITLE_INVALID",
+            ErrorCode::WikiArticleContentInvalid => "WIKI_ARTICLE_CONTENT_INVALID",
+            ErrorCode::WikiArticleCoordinatesInvalid => "WIKI_ARTICLE_COORDINATES_INVALID",
+            ErrorCode::WikiArticleTagsInvalid => "WIKI_ARTICLE_TAGS_INVALID",
+            ErrorCode::WikiArticleCreateFailed => "WIKI_ARTICLE_CREATE_FAILED",
+            ErrorCode::WikiArticleUpdateFailed => "WIKI_ARTICLE_UPDATE_FAILED",
+            ErrorCode::WikiArticleDeleteFailed => "WIKI_ARTICLE_DELETE_FAILED",
 
             ErrorCode::RateLimitExceeded => "RATE_LIMIT_EXCEEDED",
 

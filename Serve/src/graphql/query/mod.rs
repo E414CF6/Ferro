@@ -8,6 +8,7 @@ pub mod post;
 pub mod social;
 pub mod story;
 pub mod user;
+pub mod wiki;
 
 pub use bookmark::BookmarkQuery;
 pub use comment::CommentQuery;
@@ -19,6 +20,7 @@ pub use post::PostQuery;
 pub use social::SocialQuery;
 pub use story::StoryQuery;
 pub use user::UserQuery;
+pub use wiki::WikiQuery;
 
 use async_graphql::MergedObject;
 
@@ -35,4 +37,5 @@ pub struct QueryRoot(
     pub SocialQuery,
     pub BookmarkQuery,
     pub ModerationQuery,
+    pub WikiQuery,
 );

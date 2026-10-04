@@ -17,3 +17,4 @@ mod poll_repo;
 mod post_repo;
 mod story_repo;
 mod user_repo;
+mod wiki_repo;

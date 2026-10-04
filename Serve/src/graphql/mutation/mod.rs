@@ -8,6 +8,7 @@ pub mod poll;
 pub mod post;
 pub mod social;
 pub mod story;
+pub mod wiki;
 
 pub use auth::AuthMutation;
 pub use bookmark::BookmarkMutation;
@@ -19,6 +20,7 @@ pub use poll::PollMutation;
 pub use post::PostMutation;
 pub use social::SocialMutation;
 pub use story::StoryMutation;
+pub use wiki::WikiMutation;
 
 use async_graphql::MergedObject;
 
@@ -35,4 +37,5 @@ pub struct MutationRoot(
     pub ModerationMutation,
     pub DmMutation,
     pub NotificationMutation,
+    pub WikiMutation,
 );

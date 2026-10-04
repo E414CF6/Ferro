@@ -1,6 +1,7 @@
-use crate::domain::models::{Comment, Poll, PollOption, Post, PostMedia, User};
+use crate::domain::models::{Comment, Poll, PollOption, Post, PostMedia, User, WikiRevision};
 use crate::infrastructure::db::entities::{
     CommentEntity, PollEntity, PollOptionEntity, PostEntity, PostMediaEntity, UserEntity,
+    WikiRevisionEntity,
 };
 use crate::infrastructure::db::postgres::{Database, DatabaseBackend};
 
@@ -898,3 +899,62 @@ impl Loader<Uuid> for CommentLoader {
             .collect())
     }
 }
+
+/// Batch loads WikiRevision entities by their article IDs
+pub struct WikiRevisionsLoader {
+    db: Database,
+}
+
+impl WikiRevisionsLoader {
+    pub fn new(db: Database) -> Self {
+        Self { db }
+    }
+}
+
+impl Loader<Uuid> for WikiRevisionsLoader {
+    type Value = Vec<WikiRevision>;
+    type Error = Arc<sqlx::Error>;
+
+    async fn load(&self, keys: &[Uuid]) -> Result<HashMap<Uuid, Self::Value>, Self::Error> {
+        if keys.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let entities: Vec<WikiRevisionEntity> = match self.db.backend() {
+            DatabaseBackend::Postgres(pool) => {
+                sqlx::query_as::<_, WikiRevisionEntity>(
+                    "SELECT * FROM wiki_revisions WHERE article_id = ANY($1) ORDER BY created_at DESC",
+                )
+                .bind(keys)
+                .fetch_all(pool)
+                .await
+                .map_err(Arc::new)?
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let sql = sqlite_in(
+                    "SELECT * FROM wiki_revisions",
+                    "article_id",
+                    keys.len(),
+                    "ORDER BY created_at DESC",
+                );
+                let mut query = sqlx::query_as::<_, WikiRevisionEntity>(AssertSqlSafe(sql.as_str()));
+                for k in keys {
+                    query = query.bind(k);
+                }
+                query.fetch_all(pool).await.map_err(Arc::new)?
+            }
+        };
+
+        let mut map: HashMap<Uuid, Vec<WikiRevision>> = HashMap::new();
+        for k in keys {
+            map.insert(*k, Vec::new());
+        }
+        for entity in entities {
+            let rev = WikiRevision::from(entity);
+            map.entry(rev.article_id).or_default().push(rev);
+        }
+
+        Ok(map)
+    }
+}
+

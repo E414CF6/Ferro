@@ -423,3 +423,103 @@ impl From<NotificationEntity> for Notification {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Wiki Map (wMap) Database Entities
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, FromRow)]
+pub struct WikiArticleEntity {
+    pub id: Uuid,
+    #[sqlx(default)]
+    pub user_id: Option<Uuid>,
+    pub title: String,
+    pub slug: String,
+    pub summary: Option<String>,
+    pub content: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub zoom: f64,
+    pub category: String,
+    pub tags: String,
+    pub geojson: Option<String>,
+    pub author: String,
+    pub views: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<WikiArticleEntity> for WikiArticle {
+    fn from(e: WikiArticleEntity) -> Self {
+        let tags: Vec<String> = serde_json::from_str(&e.tags).unwrap_or_default();
+        Self {
+            id: e.id,
+            user_id: e.user_id,
+            title: e.title,
+            slug: e.slug,
+            summary: e.summary,
+            content: e.content,
+            latitude: e.latitude,
+            longitude: e.longitude,
+            zoom: e.zoom,
+            category: e.category,
+            tags,
+            geojson: e.geojson,
+            author: e.author,
+            views: e.views,
+            created_at: e.created_at,
+            updated_at: e.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct WikiRevisionEntity {
+    pub id: Uuid,
+    pub article_id: Uuid,
+    #[sqlx(default)]
+    pub user_id: Option<Uuid>,
+    pub title: String,
+    pub content: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub edit_summary: Option<String>,
+    pub author: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<WikiRevisionEntity> for WikiRevision {
+    fn from(e: WikiRevisionEntity) -> Self {
+        Self {
+            id: e.id,
+            article_id: e.article_id,
+            user_id: e.user_id,
+            title: e.title,
+            content: e.content,
+            latitude: e.latitude,
+            longitude: e.longitude,
+            edit_summary: e.edit_summary,
+            author: e.author,
+            created_at: e.created_at,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, FromRow)]
+pub struct WikiViewLogEntity {
+    pub id: Uuid,
+    pub article_id: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<WikiViewLogEntity> for WikiViewLog {
+    fn from(e: WikiViewLogEntity) -> Self {
+        Self {
+            id: e.id,
+            article_id: e.article_id,
+            created_at: e.created_at,
+        }
+    }
+}
+

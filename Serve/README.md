@@ -52,6 +52,14 @@ Serve is a high-performance backend API service for the Ferro social network pla
     - Handle-based resolution (`profile(username: "...")`).
     - Full-text post searching and trending hashtag analytics.
 
+5. **Wiki Map (wMap) Geospatial Knowledge Platform**
+    - Interactive geospatial wiki articles combining Markdown documentation with geo-coordinates (`latitude`, `longitude`, `zoom`).
+    - Bounding-box geographic spatial filtering (`minLat`, `maxLat`, `minLng`, `maxLng`) and community hashtag indexing.
+    - Automated collision-safe slug generation (e.g., `gyeongbokgung`, `gyeongbokgung-1`).
+    - Immutable revision history tracking full edit summaries, authors, and timestamps.
+    - Real-time weighted popularity scores and trending hashtags (`wikiTrends`) with 15-second TTL in-memory caching.
+    - Open contribution model supporting both anonymous community edits and authenticated user linking.
+
 ---
 
 ## Getting Started

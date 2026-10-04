@@ -7,6 +7,7 @@ mod poll;
 mod post;
 mod story;
 mod user;
+mod wiki;
 
 pub use bookmark::BookmarkRepository;
 pub use comment::CommentRepository;
@@ -17,6 +18,7 @@ pub use poll::PollRepository;
 pub use post::PostRepository;
 pub use story::StoryRepository;
 pub use user::UserRepository;
+pub use wiki::WikiRepository;
 
 /// Unified repository super-trait combining all domain sub-repositories.
 /// Any type implementing all sub-traits automatically implements `AppRepository`.
@@ -30,6 +32,7 @@ pub trait AppRepository:
     + StoryRepository
     + DmRepository
     + NotificationRepository
+    + WikiRepository
 {
 }
 
@@ -42,7 +45,8 @@ impl<
         + ModerationRepository
         + StoryRepository
         + DmRepository
-        + NotificationRepository,
+        + NotificationRepository
+        + WikiRepository,
 > AppRepository for T
 {
 }

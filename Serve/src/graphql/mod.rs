@@ -9,7 +9,7 @@ use crate::infrastructure::db::loaders::{
     CommentLikesCountLoader, CommentLoader, CommentRepliesCountLoader, FollowersCountLoader,
     FollowingCountLoader, HasActiveStoriesLoader, PollOptionVotesCountLoader, PollOptionsLoader,
     PostLikesCountLoader, PostLoader, PostMediaLoader, PostPollLoader, PostRepostsCountLoader,
-    UserLoader, UserPostsCountLoader,
+    UserLoader, UserPostsCountLoader, WikiRevisionsLoader,
 };
 use crate::infrastructure::db::postgres::Database;
 use crate::infrastructure::pubsub::MessageBroker;
@@ -58,6 +58,8 @@ pub fn build_schema_with_options(
     let poll_options_loader = DataLoader::new(PollOptionsLoader::new(db.clone()), tokio::spawn);
     let poll_option_votes_loader =
         DataLoader::new(PollOptionVotesCountLoader::new(db.clone()), tokio::spawn);
+    let wiki_revisions_loader =
+        DataLoader::new(WikiRevisionsLoader::new(db.clone()), tokio::spawn);
 
     let mut builder = Schema::build(
         QueryRoot::default(),
@@ -79,6 +81,7 @@ pub fn build_schema_with_options(
     .data(app_services.poll.clone())
     .data(app_services.moderation.clone())
     .data(app_services.discovery.clone())
+    .data(app_services.wiki.clone())
     .data(app_services)
     .data(broker)
     .data(user_loader)
@@ -95,7 +98,8 @@ pub fn build_schema_with_options(
     .data(post_media_loader)
     .data(post_poll_loader)
     .data(poll_options_loader)
-    .data(poll_option_votes_loader);
+    .data(poll_option_votes_loader)
+    .data(wiki_revisions_loader);
 
     if !enable_introspection {
         builder = builder.disable_introspection();

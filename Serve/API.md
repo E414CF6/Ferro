@@ -428,6 +428,103 @@ type AuthPayload {
 
 ```
 
+### 3.4 Wiki Map (wMap) Types
+
+#### `WikiArticle`
+
+* Represents an interactive geospatial wiki document.
+
+```graphql
+type WikiArticle {
+  id: ID!
+  userId: ID
+  title: String!
+  slug: String!
+  summary: String
+  content: String!
+  latitude: Float!
+  longitude: Float!
+  zoom: Float!
+  category: String!
+  tags: [String!]!
+  geojson: String
+  author: String!
+  views: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  revisions(limit: Int): [WikiRevision!]!
+}
+```
+
+#### `WikiRevision`
+
+* Version history record capturing edits made to an article.
+
+```graphql
+type WikiRevision {
+  id: ID!
+  articleId: ID!
+  userId: ID
+  title: String!
+  content: String!
+  latitude: Float!
+  longitude: Float!
+  editSummary: String
+  author: String!
+  createdAt: DateTime!
+}
+```
+
+#### `TrendsData`, `TrendingArticleItem` & `TrendingTagItem`
+
+* Real-time trending ranking metrics computed from weighted recent view logs.
+
+```graphql
+enum RankChangeType {
+  UP
+  DOWN
+  SAME
+  NEW
+}
+
+type TrendingArticleItem {
+  rank: Int!
+  prevRank: Int
+  change: RankChangeType!
+  changeAmount: Int
+  id: ID!
+  title: String!
+  slug: String!
+  summary: String
+  latitude: Float!
+  longitude: Float!
+  zoom: Float!
+  category: String!
+  tags: [String!]!
+  views: Int!
+  recentViews: Int!
+  score: Int!
+  updatedAt: DateTime!
+}
+
+type TrendingTagItem {
+  rank: Int!
+  prevRank: Int
+  change: RankChangeType!
+  changeAmount: Int
+  tag: String!
+  count: Int!
+  score: Int!
+}
+
+type TrendsData {
+  articles: [TrendingArticleItem!]!
+  tags: [TrendingTagItem!]!
+  updatedAt: DateTime!
+  totalArticles: Int!
+}
+```
+
 ---
 
 ## 4. GraphQL Queries
@@ -471,6 +568,10 @@ type AuthPayload {
 | **`bookmarkCollections`**        | `userId: ID`                                      | `[BookmarkCollection!]!`   | Optional              | Fetches user-defined bookmark collections                       |
 | **`bookmarkCollection`**         | `id: ID!`                                         | `BookmarkCollection`       | None                  | Details for a specific bookmark collection folder               |
 | **`reports`**                    | `status: ReportStatusGql`, `limit: Int`           | `[Report!]!`               | **Required**          | Administrative query for reviewable moderation incident reports |
+| **`articles`**                   | `filter: ArticleFilterInput`                      | `[WikiArticle!]!`          | None                  | Geospatial wiki article catalog with bounding box & tag filters |
+| **`article`**                    | `slug: String!`                                   | `WikiArticle`              | None                  | Fetches complete wiki article detail by URL slug                |
+| **`wikiTrends`**                 | `forceRefresh: Boolean`                           | `TrendsData!`              | None                  | Real-time Top 10 articles and trending hashtags                 |
+
 
 ---
 
@@ -720,6 +821,22 @@ removePostFromCollection(collectionId: ID!, postId: ID!, userId: ID): Boolean!
 
 ```
 
+### 5.7 Wiki Map (wMap)
+
+```graphql
+# Create a new geospatial wiki article (supports anonymous & authenticated user linking)
+createArticle(input: CreateArticleInput!): WikiArticle!
+
+# Update an existing wiki article and append a revision history record
+updateArticle(slug: String!, input: UpdateArticleInput!): WikiArticle!
+
+# Delete a wiki article by its URL slug
+deleteArticle(slug: String!): Boolean!
+
+# Increment view counter and log view event for real-time trending calculation
+recordArticleView(articleId: ID!): Boolean!
+```
+
 ---
 
 ## 6. GraphQL Subscriptions
@@ -848,5 +965,13 @@ When a request encounters a domain error, the GraphQL execution result populates
 |                          | `POLL_EXPIRED`               | Poll voting deadline reached                              |
 | **Messaging**            | `DM_CANNOT_SEND_TO_SELF`     | Self-directed direct messages are forbidden               |
 |                          | `CONVERSATION_NOT_FOUND`     | Conversation thread not found                             |
+| **Wiki Map (wMap)**      | `WIKI_ARTICLE_NOT_FOUND`     | Targeted wiki article does not exist                      |
+|                          | `WIKI_ARTICLE_TITLE_INVALID` | Article title empty or exceeds 100 characters             |
+|                          | `WIKI_ARTICLE_CONTENT_INVALID` | Article content body is empty                           |
+|                          | `WIKI_ARTICLE_COORDINATES_INVALID` | Latitude/Longitude outside valid geographic bounds (-90..90, -180..180) |
+|                          | `WIKI_ARTICLE_TAGS_INVALID`  | Hashtag list exceeds maximum allowed count (max 15 tags)  |
+|                          | `WIKI_ARTICLE_CREATE_FAILED` | Internal database failure creating article or revision    |
+|                          | `WIKI_ARTICLE_UPDATE_FAILED` | Internal database failure updating article or revision    |
+|                          | `WIKI_ARTICLE_DELETE_FAILED` | Internal database failure removing wiki article           |
 | **System & Security**    | `RATE_LIMIT_EXCEEDED`        | Sliding rate limit threshold breached (HTTP 429)          |
 |                          | `INVALID_CURSOR`             | Invalid, unparseable, or expired pagination cursor        |

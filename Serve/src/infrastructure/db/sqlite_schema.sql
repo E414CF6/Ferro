@@ -302,3 +302,57 @@ CREATE INDEX IF NOT EXISTS idx_stories_author ON stories (author_id);
 CREATE INDEX IF NOT EXISTS idx_dm_recipient ON direct_messages (recipient_id);
 CREATE INDEX IF NOT EXISTS idx_dm_sender ON direct_messages (sender_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications (recipient_id);
+
+-- Wiki Map (wMap) Integration
+CREATE TABLE IF NOT EXISTS wiki_articles
+(
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT REFERENCES users (id) ON DELETE SET NULL,
+    title       TEXT    NOT NULL,
+    slug        TEXT UNIQUE NOT NULL,
+    summary     TEXT,
+    content     TEXT    NOT NULL,
+    latitude    REAL    NOT NULL,
+    longitude   REAL    NOT NULL,
+    zoom        REAL    NOT NULL DEFAULT 14.0,
+    category    TEXT    NOT NULL DEFAULT '장소',
+    tags        TEXT    NOT NULL DEFAULT '[]',
+    geojson     TEXT,
+    author      TEXT    NOT NULL DEFAULT '익명',
+    views       INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wiki_revisions
+(
+    id           TEXT PRIMARY KEY,
+    article_id   TEXT NOT NULL REFERENCES wiki_articles (id) ON DELETE CASCADE,
+    user_id      TEXT REFERENCES users (id) ON DELETE SET NULL,
+    title        TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    latitude     REAL NOT NULL,
+    longitude    REAL NOT NULL,
+    edit_summary TEXT,
+    author       TEXT NOT NULL DEFAULT '익명',
+    created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wiki_view_logs
+(
+    id         TEXT PRIMARY KEY,
+    article_id TEXT NOT NULL REFERENCES wiki_articles (id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_wiki_articles_lat_lng ON wiki_articles (latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_wiki_articles_category ON wiki_articles (category);
+CREATE INDEX IF NOT EXISTS idx_wiki_articles_slug ON wiki_articles (slug);
+CREATE INDEX IF NOT EXISTS idx_wiki_articles_views ON wiki_articles (views DESC);
+CREATE INDEX IF NOT EXISTS idx_wiki_articles_updated_at ON wiki_articles (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wiki_articles_user_id ON wiki_articles (user_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_revisions_article_id ON wiki_revisions (article_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_revisions_created_at ON wiki_revisions (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wiki_view_logs_article_created ON wiki_view_logs (article_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_wiki_view_logs_created_at ON wiki_view_logs (created_at);
+

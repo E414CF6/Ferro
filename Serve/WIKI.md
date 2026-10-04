@@ -63,6 +63,17 @@ Rich, customizable user identities.
 - **Details**: Includes avatar, header images, bio, and more.
 - **Social Stats**: Dynamically calculated fields like post counts and follower status.
 
+### 🗺️ Wiki Map (wMap) Integration
+
+Interactive geospatial wiki platform natively integrated into the GraphQL architecture.
+
+- **Geospatial Knowledge**: Rich Markdown articles linked with geographical coordinates (latitude, longitude, zoom level), categories, and community hashtags.
+- **Unique Slug Generation**: Automated URL-safe slug resolution with collision mitigation (e.g. `gyeongbokgung`, `gyeongbokgung-1`).
+- **Version History & Revisions**: Full immutable revision trail logging edits, summaries, authors, and timestamps.
+- **Real-Time Trending Analytics**: Algorithmic Top 10 articles and trending hashtags computed dynamically from 24h/3h view logs with 15-second TTL in-memory caching.
+- **Flexible Authoring**: Supports both anonymous open contributions and authenticated user profile linking.
+
+
 ## 🛠 Development & Setup
 
 ### Prerequisites
