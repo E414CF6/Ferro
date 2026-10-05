@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, {useEffect, useState} from "react";
 
 interface SplashScreenProps {
     onFinished?: () => void;
@@ -35,106 +35,108 @@ export default function SplashScreen({
                 position: "fixed",
                 inset: 0,
                 zIndex: 99999,
-                backgroundColor: "var(--bg-main, #070a12)",
+                backgroundColor: "#000000",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 opacity: fade ? 0 : 1,
-                transition: "opacity 0.35s ease-out",
+                transform: fade ? "scale(1.08)" : "scale(1)",
+                transition: "opacity 0.35s ease-out, transform 0.35s ease-out",
                 pointerEvents: fade ? "none" : "all",
             }}
         >
-            {/* Background Radial Glow */}
+            {/* Center Geometric Wireframe 'F' Logo (from Login Page) */}
             <div
                 style={{
-                    position: "absolute",
-                    width: "360px",
-                    height: "360px",
-                    borderRadius: "50%",
-                    background: "radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, rgba(168, 85, 247, 0.08) 50%, transparent 70%)",
-                    filter: "blur(40px)",
-                    pointerEvents: "none",
-                }}
-            />
-
-            {/* Logo Badge */}
-            <div
-                style={{
-                    width: "80px",
-                    height: "80px",
-                    borderRadius: "22px",
-                    background: "linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%)",
-                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    width: "96px",
+                    height: "96px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "#fff",
-                    fontWeight: 900,
-                    boxShadow: "0 0 32px rgba(56, 189, 248, 0.3)",
-                    marginBottom: "20px",
-                    animation: "splashFloat 2s ease-in-out infinite",
+                    animation: "splashPulse 1.6s ease-in-out infinite",
+                    filter: "drop-shadow(0 0 24px rgba(255, 255, 255, 0.15))",
                 }}
             >
-                F
-            </div>
+                <svg
+                    viewBox="0 0 600 600"
+                    width="100%"
+                    height="100%"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                >
+                    <defs>
+                        {/* Metallic Chrome Stroke Gradients */}
+                        <linearGradient id="splashChromeOuter" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95"/>
+                            <stop offset="25%" stopColor="#71767b" stopOpacity="0.8"/>
+                            <stop offset="45%" stopColor="#1e2229" stopOpacity="0.85"/>
+                            <stop offset="70%" stopColor="#cbd5e1" stopOpacity="0.9"/>
+                            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95"/>
+                        </linearGradient>
+                        <linearGradient id="splashChromeInner" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85"/>
+                            <stop offset="30%" stopColor="#475569" stopOpacity="0.7"/>
+                            <stop offset="55%" stopColor="#0f172a" stopOpacity="0.9"/>
+                            <stop offset="85%" stopColor="#94a3b8" stopOpacity="0.8"/>
+                            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.85"/>
+                        </linearGradient>
+                    </defs>
 
-            {/* Brand Title */}
-            <h1
-                style={{
-                    fontSize: "32px",
-                    fontWeight: 800,
-                    color: "var(--text-primary, #f8fafc)",
-                    letterSpacing: "-0.8px",
-                    margin: 0,
-                }}
-            >
-                Ferro
-            </h1>
+                    {/* Outer Geometric Wireframe F Outline */}
+                    <path
+                        d="M120 70 L480 70 L460 160 L240 160 L230 250 L410 250 L390 330 L220 330 L195 530 L105 530 Z"
+                        stroke="url(#splashChromeOuter)"
+                        strokeWidth="6"
+                        strokeLinejoin="miter"
+                        strokeMiterlimit="4"
+                        opacity="0.95"
+                    />
 
-            {/* Minimal Loading Indicator */}
-            <div
-                style={{
-                    marginTop: "32px",
-                    width: "120px",
-                    height: "3px",
-                    borderRadius: "9999px",
-                    backgroundColor: "rgba(255, 255, 255, 0.08)",
-                    overflow: "hidden",
-                    position: "relative",
-                }}
-            >
-                <div
-                    style={{
-                        position: "absolute",
-                        top: 0,
-                        bottom: 0,
-                        width: "45%",
-                        background: "linear-gradient(90deg, #38bdf8, #a855f7)",
-                        borderRadius: "9999px",
-                        animation: "splashProgress 1.2s ease-in-out infinite",
-                    }}
-                />
+                    {/* Inner Parallel Precision Wireframe F Contour */}
+                    <path
+                        d="M145 95 L445 95 L433 140 L260 140 L250 270 L380 270 L368 310 L240 310 L215 505 L135 505 Z"
+                        stroke="url(#splashChromeInner)"
+                        strokeWidth="3"
+                        strokeLinejoin="miter"
+                        strokeMiterlimit="4"
+                        opacity="0.75"
+                    />
+
+                    {/* Bevel Chamfer Connectors */}
+                    <line x1="120" y1="70" x2="145" y2="95" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="480" y1="70" x2="445" y2="95" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="460" y1="160" x2="433" y2="140" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="240" y1="160" x2="260" y2="140" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="230" y1="250" x2="250" y2="270" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="410" y1="250" x2="380" y2="270" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="390" y1="330" x2="368" y2="310" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="220" y1="330" x2="240" y2="310" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="195" y1="530" x2="215" y2="505" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                    <line x1="105" y1="530" x2="135" y2="505" stroke="url(#splashChromeOuter)" strokeWidth="2.5"
+                          opacity="0.6"/>
+                </svg>
             </div>
 
             <style jsx>{`
-                @keyframes splashFloat {
+                @keyframes splashPulse {
                     0%, 100% {
-                        transform: translateY(0px) scale(1);
+                        transform: scale(1);
+                        opacity: 0.95;
                     }
                     50% {
-                        transform: translateY(-6px) scale(1.02);
-                    }
-                }
-                @keyframes splashProgress {
-                    0% {
-                        left: -45%;
-                    }
-                    50% {
-                        left: 45%;
-                    }
-                    100% {
-                        left: 100%;
+                        transform: scale(1.05);
+                        opacity: 1;
                     }
                 }
             `}</style>

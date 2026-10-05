@@ -1,50 +1,83 @@
 "use client";
 
-import React, { useState } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { useToast } from "@/lib/toast-context";
-import { formatErrorMessage } from "@/lib/i18n";
-import { Check, Eye, EyeOff, Lock, LogIn, Mail, Sparkles, User as UserIcon, UserPlus, X } from "lucide-react";
+import React, {useState} from "react";
+import {useAuth} from "@/lib/auth-context";
+import {useToast} from "@/lib/toast-context";
+import {formatErrorMessage} from "@/lib/i18n";
+import {ArrowLeft, Eye, EyeOff, Loader2, X} from "lucide-react";
 
 interface AuthModalProps {
     onClose: () => void;
     initialMode?: "login" | "signup";
 }
 
-export default function AuthModal({ onClose, initialMode = "login" }: AuthModalProps) {
-    const { login, signup } = useAuth();
+export default function AuthModal({onClose}: AuthModalProps) {
+    const {login, signup, googleLogin} = useAuth();
     const { showToast } = useToast();
 
-    const [mode, setMode] = useState<"login" | "signup">(initialMode);
+    const [step, setStep] = useState<1 | 2>(1);
+    const [identifier, setIdentifier] = useState("");
+    const [password, setPassword] = useState("");
+    const [displayName, setDisplayName] = useState("");
+    const [isNewUser, setIsNewUser] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Login form state
-    const [loginEmail, setLoginEmail] = useState("");
-    const [loginPassword, setLoginPassword] = useState("");
-    const [showLoginPassword, setShowLoginPassword] = useState(false);
+    // Google modal state
+    const [showGooglePrompt, setShowGooglePrompt] = useState(false);
+    const [googleEmail, setGoogleEmail] = useState("");
+    const [googleName, setGoogleName] = useState("");
+    const [googleLoading, setGoogleLoading] = useState(false);
 
-    // Signup form state
-    const [signupUsername, setSignupUsername] = useState("");
-    const [signupDisplayName, setSignupDisplayName] = useState("");
-    const [signupEmail, setSignupEmail] = useState("");
-    const [signupPassword, setSignupPassword] = useState("");
-    const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
-    const [showSignupPassword, setShowSignupPassword] = useState(false);
-    const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
-
-    const handleLoginSubmit = async (e: React.FormEvent) => {
+    const handleProceed = (e: React.FormEvent) => {
         e.preventDefault();
-        const cleanEmail = loginEmail.trim().toLowerCase();
-        if (!cleanEmail || !loginPassword) {
-            showToast("이메일 주소와 비밀번호를 모두 입력해주세요.", "error");
-            return;
-        }
+        const cleanId = identifier.trim().toLowerCase();
+        if (!cleanId) return;
+        setDisplayName(cleanId.includes("@") ? cleanId.split("@")[0] : cleanId);
+        setStep(2);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const cleanId = identifier.trim().toLowerCase();
+        if (!cleanId || !password) return;
 
         setLoading(true);
         try {
-            await login(cleanEmail, loginPassword);
-            showToast("로그인되었습니다.", "success");
-            onClose();
+            try {
+                await login(cleanId, password);
+                showToast("로그인되었습니다.", "success");
+                onClose();
+                return;
+            } catch (loginErr: any) {
+                const errMsg = String(loginErr?.message || "");
+                const isNotFound =
+                    errMsg.toLowerCase().includes("not found") ||
+                    errMsg.toLowerCase().includes("usernotfound") ||
+                    errMsg.includes("사용자") ||
+                    isNewUser;
+
+                if (isNotFound) {
+                    const isEmail = cleanId.includes("@");
+                    const username = isEmail
+                        ? cleanId.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 24)
+                        : cleanId;
+                    const email = isEmail ? cleanId : `${cleanId}@ferro.app`;
+                    const name = displayName.trim() || username;
+
+                    await signup({
+                        username: username.length >= 3 ? username : `user_${username}`,
+                        email,
+                        password,
+                        displayName: name,
+                    });
+                    showToast("환영합니다! 계정이 생성되었습니다.", "success");
+                    onClose();
+                    return;
+                }
+
+                showToast(formatErrorMessage(loginErr, "ko"), "error");
+            }
         } catch (err: any) {
             showToast(formatErrorMessage(err, "ko"), "error");
         } finally {
@@ -52,83 +85,61 @@ export default function AuthModal({ onClose, initialMode = "login" }: AuthModalP
         }
     };
 
-    const handleSignupSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const cleanUsername = signupUsername.trim().toLowerCase();
-        const cleanEmail = signupEmail.trim().toLowerCase();
-        const cleanDisplayName = signupDisplayName.trim() || cleanUsername;
+    const handleGoogleAuth = async (emailToUse?: string, nameToUse?: string) => {
+        const targetEmail = (emailToUse || googleEmail).trim().toLowerCase();
+        const targetName = (nameToUse || googleName || targetEmail.split("@")[0]).trim();
 
-        if (!cleanUsername || !cleanEmail || !signupPassword || !cleanDisplayName) {
-            showToast("필수 입력 항목을 모두 작성해주세요.", "error");
+        if (!targetEmail || !targetEmail.includes("@")) {
+            showToast("올바른 Google 이메일을 입력해주세요.", "error");
             return;
         }
 
-        if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanUsername)) {
-            showToast("아이디는 3~30자의 영문, 숫자, 밑줄(_)만 가능합니다.", "error");
-            return;
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-            showToast("유효한 이메일 형식을 입력해주세요.", "error");
-            return;
-        }
-
-        if (signupPassword.length < 8) {
-            showToast("비밀번호는 최소 8자 이상이어야 합니다.", "error");
-            return;
-        }
-
-        if (signupPassword !== signupConfirmPassword) {
-            showToast("비밀번호 확인이 일치하지 않습니다.", "error");
-            return;
-        }
-
-        setLoading(true);
+        setGoogleLoading(true);
         try {
-            await signup({
-                username: cleanUsername,
-                email: cleanEmail,
-                password: signupPassword,
-                displayName: cleanDisplayName,
+            await googleLogin({
+                email: targetEmail,
+                name: targetName,
             });
-
-            showToast(`환영합니다! @${cleanUsername} 계정이 생성되었습니다.`, "success");
+            showToast("Google 계정으로 로그인되었습니다.", "success");
             onClose();
         } catch (err: any) {
             showToast(formatErrorMessage(err, "ko"), "error");
         } finally {
-            setLoading(false);
+            setGoogleLoading(false);
         }
     };
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "440px" }}>
-                {/* Modal Header */}
-                <div className="modal-header">
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}
+                 style={{maxWidth: "400px", padding: "28px"}}>
+                {/* Header */}
+                <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: "20px"
+                }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <div
-                            className="logo-badge"
                             style={{
-                                width: "36px",
-                                height: "36px",
-                                fontSize: "16px",
-                                color: "#fff",
-                                fontWeight: 900,
+                                width: "32px",
+                                height: "32px",
                                 borderRadius: "8px",
+                                background: "#000000",
+                                border: "1px solid #333639",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: 900,
+                                color: "#ffffff",
+                                fontSize: "16px",
                             }}
                         >
                             F
                         </div>
-                        <div>
-                            <h2 className="modal-title" style={{ fontSize: "18px" }}>
-                                {mode === "login" ? "로그인" : "회원가입"}
-                            </h2>
-                            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>
-                                {mode === "login"
-                                    ? "이메일 주소로 로그인하세요"
-                                    : "새로운 계정을 생성하세요"}
-                            </p>
+                        <div style={{fontSize: "18px", fontWeight: 800, color: "#ffffff"}}>
+                            Ferro 시작하기
                         </div>
                     </div>
                     <button onClick={onClose} className="modal-close-btn" aria-label="닫기">
@@ -136,264 +147,202 @@ export default function AuthModal({ onClose, initialMode = "login" }: AuthModalP
                     </button>
                 </div>
 
-                <div className="modal-body">
-                    {mode === "login" ? (
-                        /* Login Mode */
-                        <form onSubmit={handleLoginSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">
-                                    <Mail size={13} style={{ display: "inline", marginRight: "4px" }} />
-                                    이메일 주소
-                                </label>
-                                <input
-                                    type="email"
-                                    className="form-input"
-                                    placeholder="name@example.com"
-                                    value={loginEmail}
-                                    onChange={(e) => setLoginEmail(e.target.value)}
-                                    autoFocus
-                                    required
-                                />
-                            </div>
+                {!showGooglePrompt ? (
+                    <div>
+                        {step === 1 ? (
+                            <div style={{display: "flex", flexDirection: "column", gap: "12px"}}>
+                                {/* Google Sign-In */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGooglePrompt(true)}
+                                    className="x-pill-btn x-btn-google"
+                                >
+                                    <svg className="x-google-icon" viewBox="0 0 24 24" width="18" height="18">
+                                        <path
+                                            fill="#4285F4"
+                                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                                        />
+                                        <path
+                                            fill="#34A853"
+                                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                        />
+                                        <path
+                                            fill="#FBBC05"
+                                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                                        />
+                                        <path
+                                            fill="#EA4335"
+                                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                                        />
+                                    </svg>
+                                    <span>Google 계정으로 계속하기</span>
+                                </button>
 
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">
-                                    <Lock size={13} style={{ display: "inline", marginRight: "4px" }} />
-                                    비밀번호
-                                </label>
-                                <div style={{ position: "relative" }}>
+                                <div className="x-divider">
+                                    <span className="x-divider-line"/>
+                                    <span className="x-divider-text">또는</span>
+                                    <span className="x-divider-line"/>
+                                </div>
+
+                                <form onSubmit={handleProceed}
+                                      style={{display: "flex", flexDirection: "column", gap: "12px"}}>
                                     <input
-                                        type={showLoginPassword ? "text" : "password"}
-                                        className="form-input"
-                                        placeholder="비밀번호를 입력하세요"
-                                        value={loginPassword}
-                                        onChange={(e) => setLoginPassword(e.target.value)}
-                                        style={{ paddingRight: "36px" }}
+                                        type="text"
+                                        placeholder="이메일 또는 사용자 이름"
+                                        value={identifier}
+                                        onChange={(e) => setIdentifier(e.target.value)}
+                                        className="x-text-input"
+                                        autoFocus
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!identifier.trim()}
+                                        className="x-pill-btn x-btn-primary"
+                                    >
+                                        계속
+                                    </button>
+                                </form>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSubmit}
+                                  style={{display: "flex", flexDirection: "column", gap: "12px"}}>
+                                <div className="x-identifier-chip">
+                                    <div className="x-chip-content">
+                                        <span className="x-chip-label">계정</span>
+                                        <span className="x-chip-val">{identifier}</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setStep(1)}
+                                        className="x-chip-change-btn"
+                                    >
+                                        <ArrowLeft size={13}/> 변경
+                                    </button>
+                                </div>
+
+                                {isNewUser && (
+                                    <input
+                                        type="text"
+                                        placeholder="닉네임"
+                                        value={displayName}
+                                        onChange={(e) => setDisplayName(e.target.value)}
+                                        className="x-text-input"
+                                    />
+                                )}
+
+                                <div className="x-input-with-icon">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="비밀번호"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="x-text-input"
+                                        autoFocus
                                         required
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => setShowLoginPassword(!showLoginPassword)}
-                                        style={{
-                                            position: "absolute",
-                                            right: 10,
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            color: "var(--text-muted)",
-                                            background: "none",
-                                            border: "none",
-                                            cursor: "pointer",
-                                        }}
-                                        aria-label={showLoginPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="x-input-action-btn"
                                     >
-                                        {showLoginPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                        {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
                                     </button>
                                 </div>
-                            </div>
 
+                                <button
+                                    type="submit"
+                                    disabled={!password || loading}
+                                    className="x-pill-btn x-btn-primary"
+                                >
+                                    {loading ? <Loader2 size={16} className="x-spin"/> : "계속"}
+                                </button>
+                            </form>
+                        )}
+
+                        <p className="x-legal-notice" style={{marginTop: "14px", textAlign: "center"}}>
+                            로그인 / 회원가입 구분 없이 계정이 없으면 자동으로 생성됩니다.
+                        </p>
+                    </div>
+                ) : (
+                    /* Google Prompt */
+                    <div style={{display: "flex", flexDirection: "column", gap: "12px"}}>
+                        <div style={{display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px"}}>
                             <button
-                                type="submit"
-                                disabled={loading || !loginEmail.trim() || !loginPassword}
-                                className="btn-primary"
-                                style={{ width: "100%", padding: "12px", marginTop: "8px", fontWeight: 700 }}
-                            >
-                                <LogIn size={16} />
-                                {loading ? "로그인 중..." : "로그인"}
-                            </button>
-
-                            <div
+                                type="button"
+                                onClick={() => setShowGooglePrompt(false)}
                                 style={{
-                                    textAlign: "center",
-                                    fontSize: "13px",
-                                    color: "var(--text-secondary)",
-                                    marginTop: "10px",
-                                    paddingTop: "12px",
-                                    borderTop: "1px solid var(--border-subtle)",
+                                    background: "none",
+                                    border: "none",
+                                    color: "#71767b",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center"
                                 }}
                             >
-                                계정이 아직 없으신가요?{" "}
-                                <button
-                                    type="button"
-                                    onClick={() => setMode("signup")}
-                                    style={{
-                                        color: "var(--accent-primary)",
-                                        fontWeight: 700,
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                    }}
-                                >
-                                    회원가입
-                                </button>
-                            </div>
-                        </form>
-                    ) : (
-                        /* Signup Mode */
-                        <form onSubmit={handleSignupSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">아이디 (핸들) *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="handle"
-                                        value={signupUsername}
-                                        onChange={(e) => setSignupUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
-                                        maxLength={30}
-                                        autoFocus
-                                        required
-                                    />
+                                <ArrowLeft size={16}/>
+                            </button>
+                            <span style={{fontSize: "14px", fontWeight: 700, color: "#ffffff"}}>Google 계정 선택</span>
+                        </div>
+
+                        <div className="x-google-accounts-list">
+                            <button
+                                type="button"
+                                disabled={googleLoading}
+                                onClick={() => handleGoogleAuth("ferro@example.com", "Ferro Dev")}
+                                className="x-google-account-item"
+                            >
+                                <div className="x-google-avatar">F</div>
+                                <div className="x-google-account-info">
+                                    <div className="x-google-account-name">Ferro Dev</div>
+                                    <div className="x-google-account-email">ferro@example.com</div>
                                 </div>
-
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">표시 이름 *</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="홍길동"
-                                        value={signupDisplayName}
-                                        onChange={(e) => setSignupDisplayName(e.target.value)}
-                                        maxLength={50}
-                                        required
-                                    />
+                            </button>
+                            <button
+                                type="button"
+                                disabled={googleLoading}
+                                onClick={() => handleGoogleAuth("alex@example.com", "Alex Coder")}
+                                className="x-google-account-item"
+                            >
+                                <div className="x-google-avatar" style={{background: "#8b5cf6"}}>A</div>
+                                <div className="x-google-account-info">
+                                    <div className="x-google-account-name">Alex Coder</div>
+                                    <div className="x-google-account-email">alex@example.com</div>
                                 </div>
-                            </div>
+                            </button>
+                        </div>
 
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label className="form-label">
-                                    <Mail size={13} style={{ display: "inline", marginRight: "4px" }} />
-                                    이메일 주소 *
-                                </label>
-                                <input
-                                    type="email"
-                                    className="form-input"
-                                    placeholder="name@example.com"
-                                    value={signupEmail}
-                                    onChange={(e) => setSignupEmail(e.target.value)}
-                                    required
-                                />
-                            </div>
+                        <div className="x-divider">
+                            <span className="x-divider-line"/>
+                            <span className="x-divider-text">다른 Google 이메일</span>
+                            <span className="x-divider-line"/>
+                        </div>
 
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">비밀번호 *</label>
-                                    <div style={{ position: "relative" }}>
-                                        <input
-                                            type={showSignupPassword ? "text" : "password"}
-                                            className="form-input"
-                                            placeholder="8자 이상"
-                                            value={signupPassword}
-                                            onChange={(e) => setSignupPassword(e.target.value)}
-                                            style={{ paddingRight: "30px" }}
-                                            required
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSignupPassword(!showSignupPassword)}
-                                            style={{
-                                                position: "absolute",
-                                                right: 8,
-                                                top: "50%",
-                                                transform: "translateY(-50%)",
-                                                color: "var(--text-muted)",
-                                                background: "none",
-                                                border: "none",
-                                                cursor: "pointer",
-                                            }}
-                                            aria-label={showSignupPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
-                                        >
-                                            {showSignupPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="form-group" style={{ marginBottom: 0 }}>
-                                    <label className="form-label">비밀번호 확인 *</label>
-                                    <div style={{ position: "relative" }}>
-                                        <input
-                                            type={showSignupConfirmPassword ? "text" : "password"}
-                                            className="form-input"
-                                            placeholder="비밀번호 확인"
-                                            value={signupConfirmPassword}
-                                            onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                                            style={{ paddingRight: "30px" }}
-                                            required
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
-                                            style={{
-                                                position: "absolute",
-                                                right: 8,
-                                                top: "50%",
-                                                transform: "translateY(-50%)",
-                                                color: "var(--text-muted)",
-                                                background: "none",
-                                                border: "none",
-                                                cursor: "pointer",
-                                            }}
-                                            aria-label={showSignupConfirmPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
-                                        >
-                                            {showSignupConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {signupConfirmPassword && signupPassword === signupConfirmPassword && (
-                                <div style={{ fontSize: "11px", color: "#10b981", display: "flex", alignItems: "center", gap: "4px" }}>
-                                    <Check size={12} /> 비밀번호가 일치합니다
-                                </div>
-                            )}
-
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleGoogleAuth();
+                            }}
+                            style={{display: "flex", flexDirection: "column", gap: "8px"}}
+                        >
+                            <input
+                                type="email"
+                                placeholder="name@gmail.com"
+                                value={googleEmail}
+                                onChange={(e) => setGoogleEmail(e.target.value)}
+                                className="x-text-input"
+                                required
+                            />
                             <button
                                 type="submit"
-                                disabled={
-                                    loading ||
-                                    !signupUsername.trim() ||
-                                    !signupEmail.trim() ||
-                                    !signupPassword ||
-                                    signupPassword.length < 8 ||
-                                    signupPassword !== signupConfirmPassword ||
-                                    !signupDisplayName.trim()
-                                }
-                                className="btn-primary"
-                                style={{ width: "100%", padding: "12px", marginTop: "4px", fontWeight: 700 }}
+                                disabled={googleLoading || !googleEmail.includes("@")}
+                                className="x-pill-btn x-btn-primary"
                             >
-                                <UserPlus size={16} />
-                                {loading ? "가입 처리 중..." : "회원가입"}
+                                {googleLoading ? <Loader2 size={16} className="x-spin"/> : "계속"}
                             </button>
-
-                            <div
-                                style={{
-                                    textAlign: "center",
-                                    fontSize: "13px",
-                                    color: "var(--text-secondary)",
-                                    marginTop: "10px",
-                                    paddingTop: "12px",
-                                    borderTop: "1px solid var(--border-subtle)",
-                                }}
-                            >
-                                이미 계정이 있으신가요?{" "}
-                                <button
-                                    type="button"
-                                    onClick={() => setMode("login")}
-                                    style={{
-                                        color: "var(--accent-primary)",
-                                        fontWeight: 700,
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                    }}
-                                >
-                                    로그인
-                                </button>
-                            </div>
                         </form>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );
