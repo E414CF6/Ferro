@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/lib/toast-context";
 import { formatErrorMessage } from "@/lib/i18n";
-import { Eye, EyeOff, Lock, LogIn, User as UserIcon } from "lucide-react";
+import { Eye, EyeOff, Lock, LogIn, Mail } from "lucide-react";
 
 export default function LoginPage() {
     const router = useRouter();
     const { user, login } = useAuth();
     const { showToast } = useToast();
 
-    const [usernameOrEmail, setUsernameOrEmail] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -26,15 +26,15 @@ export default function LoginPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const cleanIdent = usernameOrEmail.trim();
-        if (!cleanIdent || !password) {
-            showToast("아이디와 비밀번호를 모두 입력해주세요.", "error");
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail || !password) {
+            showToast("이메일 주소와 비밀번호를 모두 입력해주세요.", "error");
             return;
         }
 
         setLoading(true);
         try {
-            await login(cleanIdent, password);
+            await login(cleanEmail, password);
             showToast("로그인되었습니다.", "success");
             router.push("/");
         } catch (err: any) {
@@ -90,9 +90,11 @@ export default function LoginPage() {
                                 borderRadius: "10px",
                                 background: "linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.2))",
                                 border: "1px solid var(--border-subtle)",
+                                color: "#fff",
+                                fontWeight: 900,
                             }}
                         >
-                            🦀
+                            F
                         </div>
                         <span
                             style={{
@@ -109,7 +111,7 @@ export default function LoginPage() {
                         로그인
                     </h1>
                     <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "6px", marginBottom: 0 }}>
-                        계정에 로그인하여 피드와 스토리를 확인하세요
+                        이메일 주소로 로그인하세요
                     </p>
                 </div>
 
@@ -125,10 +127,10 @@ export default function LoginPage() {
                                 marginBottom: "6px",
                             }}
                         >
-                            아이디 또는 이메일
+                            이메일 주소
                         </label>
                         <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                            <UserIcon
+                            <Mail
                                 size={16}
                                 style={{
                                     position: "absolute",
@@ -138,10 +140,10 @@ export default function LoginPage() {
                                 }}
                             />
                             <input
-                                type="text"
-                                placeholder="아이디 또는 이메일 주소"
-                                value={usernameOrEmail}
-                                onChange={(e) => setUsernameOrEmail(e.target.value)}
+                                type="email"
+                                placeholder="name@example.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 className="form-input"
                                 style={{ width: "100%", paddingLeft: "36px" }}
                                 autoFocus
@@ -202,7 +204,7 @@ export default function LoginPage() {
 
                     <button
                         type="submit"
-                        disabled={loading || !usernameOrEmail.trim() || !password}
+                        disabled={loading || !email.trim() || !password}
                         className="btn-primary"
                         style={{
                             width: "100%",

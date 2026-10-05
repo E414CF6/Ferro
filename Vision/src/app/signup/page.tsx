@@ -122,9 +122,11 @@ export default function SignupPage() {
                                 borderRadius: "10px",
                                 background: "linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(168, 85, 247, 0.2))",
                                 border: "1px solid var(--border-subtle)",
+                                color: "#fff",
+                                fontWeight: 900,
                             }}
                         >
-                            🦀
+                            F
                         </div>
                         <span
                             style={{

@@ -245,51 +245,6 @@ function ExploreContent() {
                 </div>
             </header>
 
-            {/* Wiki Map Discovery Highlight Banner */}
-            <div
-                style={{
-                    margin: "16px 20px",
-                    padding: "16px 20px",
-                    borderRadius: "var(--radius-lg)",
-                    background: "linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)",
-                    border: "1px solid rgba(56, 189, 248, 0.3)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "14px",
-                    flexWrap: "wrap",
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <div
-                        style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: "10px",
-                            backgroundColor: "rgba(56, 189, 248, 0.2)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "var(--accent-primary)",
-                        }}
-                    >
-                        <MapPin size={22} />
-                    </div>
-                    <div>
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>
-                            🗺️ 새로운 공간 위키 맵 (wMap) 탐색
-                        </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                            지도 위에서 실시간 지식 문서와 장소별 토픽을 직관적으로 확인해보세요.
-                        </div>
-                    </div>
-                </div>
-
-                <Link href="/map" className="btn-primary" style={{ padding: "7px 16px", fontSize: "12px" }}>
-                    위키맵 열기
-                </Link>
-            </div>
-
             {/* Trending Hashtags Tray */}
             {trendingHashtags.length > 0 && !query && (
                 <div style={{ padding: "0 20px 14px", borderBottom: "1px solid var(--border-subtle)" }}>

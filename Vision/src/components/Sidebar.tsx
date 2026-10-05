@@ -95,7 +95,7 @@ export default function Sidebar() {
                 <div>
                     {/* Logo */}
                     <Link href="/" className="logo-container">
-                        <div className="logo-badge">🦀</div>
+                        <div className="logo-badge">F</div>
                         <div className="logo-text">
                             Ferro
                         </div>
@@ -306,39 +306,7 @@ export default function Sidebar() {
                             <LogOut size={18}/>
                         </button>
                     </div>
-                ) : (
-                    <div
-                        onClick={() => setShowAuthModal(true)}
-                        style={{
-                            padding: "16px",
-                            borderRadius: "var(--radius-lg)",
-                            background:
-                                "linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)",
-                            border: "1px solid rgba(56, 189, 248, 0.3)",
-                            cursor: "pointer",
-                            textAlign: "center",
-                            transition: "all var(--transition-fast)",
-                        }}
-                    >
-                        <div
-                            style={{
-                                fontSize: "13px",
-                                fontWeight: 700,
-                                color: "var(--accent-primary)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "6px",
-                                marginBottom: "4px",
-                            }}
-                        >
-                            <Sparkles size={16}/> Ferro로 시작하기
-                        </div>
-                        <div style={{fontSize: "11px", color: "var(--text-secondary)"}}>
-                            스토리 올리고 실시간 DM 나누기
-                        </div>
-                    </div>
-                )}
+                ) : null}
             </aside>
 
             {/* Mobile Bottom Navigation */}

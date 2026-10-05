@@ -69,13 +69,14 @@ export default function SplashScreen({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "40px",
+                    color: "#fff",
+                    fontWeight: 900,
                     boxShadow: "0 0 32px rgba(56, 189, 248, 0.3)",
                     marginBottom: "20px",
                     animation: "splashFloat 2s ease-in-out infinite",
                 }}
             >
-                🦀
+                F
             </div>
 
             {/* Brand Title */}
