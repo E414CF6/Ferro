@@ -72,6 +72,7 @@ impl AuthMutation {
         &self,
         ctx: &Context<'_>,
         user_id: Option<ID>,
+        username: Option<String>,
         display_name: Option<String>,
         bio: Option<String>,
         avatar_url: Option<String>,
@@ -84,6 +85,7 @@ impl AuthMutation {
         let user = db
             .update_user_profile(
                 uid,
+                username,
                 display_name,
                 bio,
                 avatar_url,

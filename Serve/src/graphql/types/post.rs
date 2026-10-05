@@ -369,6 +369,15 @@ impl HashtagTrendGql {
     async fn count(&self) -> usize {
         self.count
     }
+
+    async fn hashtag(&self) -> &str {
+        &self.tag
+    }
+
+    #[graphql(name = "postsCount")]
+    async fn posts_count(&self) -> usize {
+        self.count
+    }
 }
 
 #[derive(Clone)]

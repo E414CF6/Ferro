@@ -228,7 +228,7 @@ export default function BookmarkCollectionModal({
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="예: 유용한 Rust 팁, 디자인 영감"
+                                    placeholder="예: 디자인 영감, 유용한 아티클"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="composer-textarea"

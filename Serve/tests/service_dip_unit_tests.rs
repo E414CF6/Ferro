@@ -659,6 +659,7 @@ impl UserRepository for MockUserRepo {
     async fn update_user_profile(
         &self,
         _user_id: Uuid,
+        _username: Option<String>,
         _display_name: Option<String>,
         _bio: Option<String>,
         _avatar_url: Option<String>,

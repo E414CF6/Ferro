@@ -75,8 +75,8 @@ pub fn build_schema_with_options(
         MutationRoot::default(),
         SubscriptionRoot,
     )
-    .limit_depth(10)
-    .limit_complexity(250)
+    .limit_depth(15)
+    .limit_complexity(2500)
     .extension(async_graphql::extensions::Tracing)
     .data(db)
     .data(app_services.auth.clone())

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { User } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { fetchGraphQL, MUTATIONS } from "@/lib/graphql";
@@ -20,9 +21,11 @@ export default function EditProfileModal({
     onClose,
     onUpdated,
 }: EditProfileModalProps) {
+    const router = useRouter();
     const { refreshUser } = useAuth();
     const { showToast } = useToast();
 
+    const [username, setUsername] = useState(user.username || "");
     const [displayName, setDisplayName] = useState(user.displayName || "");
     const [bio, setBio] = useState(user.bio || "");
     const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
@@ -59,10 +62,23 @@ export default function EditProfileModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        const cleanUsername = username.trim().toLowerCase();
+        if (!cleanUsername) {
+            showToast("아이디(핸들)를 입력해주세요.", "error");
+            return;
+        }
+        if (!/^[a-zA-Z0-9_]{3,30}$/.test(cleanUsername)) {
+            showToast("아이디는 3~30자의 영문, 숫자, 밑줄(_)만 가능합니다.", "error");
+            return;
+        }
+
         setLoading(true);
+        const usernameChanged = cleanUsername !== user.username;
 
         try {
             await fetchGraphQL(MUTATIONS.UPDATE_PROFILE, {
+                username: usernameChanged ? cleanUsername : undefined,
                 displayName: displayName.trim() || undefined,
                 bio: bio.trim() || undefined,
                 avatarUrl: avatarUrl.trim() || undefined,
@@ -81,6 +97,10 @@ export default function EditProfileModal({
             await refreshUser();
             onUpdated?.();
             onClose();
+
+            if (usernameChanged) {
+                router.push(`/profile/${cleanUsername}`);
+            }
         } catch (err: any) {
             showToast(formatErrorMessage(err, "ko"), "error");
         } finally {
@@ -201,6 +221,28 @@ export default function EditProfileModal({
                                 e.target.value = "";
                             }}
                         />
+                    </div>
+
+                    {/* Username / Handle */}
+                    <div>
+                        <label style={{ fontSize: "13px", fontWeight: 700, display: "block", marginBottom: "4px" }}>
+                            아이디 (핸들)
+                        </label>
+                        <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                            <span style={{ position: "absolute", left: "12px", color: "var(--text-muted)", fontWeight: 700 }}>@</span>
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                                maxLength={30}
+                                placeholder="username"
+                                className="composer-textarea"
+                                style={{ width: "100%", padding: "8px 12px 8px 30px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-subtle)" }}
+                            />
+                        </div>
+                        <span style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "3px", display: "block" }}>
+                            고유 프로필 주소로 사용됩니다 (@{username || "handle"})
+                        </span>
                     </div>
 
                     {/* Display Name */}

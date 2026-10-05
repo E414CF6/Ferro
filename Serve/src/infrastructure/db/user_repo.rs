@@ -116,6 +116,7 @@ impl UserRepository for Database {
     async fn update_user_profile(
         &self,
         id: Uuid,
+        username: Option<String>,
         display_name: Option<String>,
         bio: Option<String>,
         avatar_url: Option<String>,
@@ -126,6 +127,19 @@ impl UserRepository for Database {
         let mut user = self.get_user_by_id(id).await.ok_or_else(|| {
             DomainError::new(ErrorCode::UserNotFound, ErrorCode::UserNotFound.as_str())
         })?;
+
+        if let Some(ref uname) = username {
+            let clean = uname.trim().to_lowercase();
+            if clean.len() < 3 || clean.len() > 30 || !clean.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(DomainError::new(ErrorCode::AuthInvalidUsername, "아이디는 3~30자의 영문, 숫자, 밑줄(_)만 가능합니다."));
+            }
+            if let Some(existing) = self.get_user_by_username(&clean).await {
+                if existing.id != id {
+                    return Err(DomainError::new(ErrorCode::AuthUserAlreadyExists, "이미 사용 중인 아이디입니다."));
+                }
+            }
+            user.username = clean;
+        }
 
         if let Some(dn) = display_name {
             user.display_name = dn;
@@ -148,7 +162,8 @@ impl UserRepository for Database {
 
         db_execute!(
             self,
-            "UPDATE users SET display_name = $1, bio = $2, avatar_url = $3, header_image_url = $4, location = $5, website = $6 WHERE id = $7",
+            "UPDATE users SET username = $1, display_name = $2, bio = $3, avatar_url = $4, header_image_url = $5, location = $6, website = $7 WHERE id = $8",
+            &user.username,
             &user.display_name,
             &user.bio,
             &user.avatar_url,

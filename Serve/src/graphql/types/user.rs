@@ -72,6 +72,11 @@ impl UserGql {
         self.0.is_2fa_enabled
     }
 
+    #[graphql(name = "is2faEnabled")]
+    async fn is_2fa_enabled_alias(&self) -> bool {
+        self.0.is_2fa_enabled
+    }
+
     async fn created_at(&self) -> DateTime<Utc> {
         self.0.created_at
     }

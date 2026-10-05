@@ -207,7 +207,7 @@ export default function ListsPage() {
                         관심 있는 개발자들을 모아 맞춤형 피드를 관리해보세요.
                     </p>
                     <Link
-                        href="/welcome?tab=login"
+                        href="/login"
                         className="btn-primary"
                         style={{ marginTop: "16px", display: "inline-flex" }}
                     >
@@ -382,7 +382,7 @@ export default function ListsPage() {
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="예: Rust 핵심 개발진, UI 디자이너"
+                                    placeholder="예: 크리에이터, 디자이너, 친구들"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="composer-textarea"

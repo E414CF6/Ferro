@@ -188,7 +188,7 @@ export default function NotificationsPage() {
                         알림을 확인하려면 계정에 로그인하세요.
                     </p>
                     <Link
-                        href="/welcome?tab=login"
+                        href="/login"
                         className="btn-primary"
                         style={{ marginTop: "16px", display: "inline-flex" }}
                     >

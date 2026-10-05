@@ -109,7 +109,7 @@ export default function BookmarksPage() {
                         나만의 북마크 컬렉션을 관리하려면 로그인하세요.
                     </p>
                     <Link
-                        href="/welcome?tab=login"
+                        href="/login"
                         className="btn-primary"
                         style={{ marginTop: "16px", display: "inline-flex" }}
                     >

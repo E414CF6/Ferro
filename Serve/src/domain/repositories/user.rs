@@ -25,6 +25,7 @@ pub trait UserRepository: Send + Sync {
     async fn update_user_profile(
         &self,
         user_id: Uuid,
+        username: Option<String>,
         display_name: Option<String>,
         bio: Option<String>,
         avatar_url: Option<String>,

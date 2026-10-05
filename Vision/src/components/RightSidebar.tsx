@@ -62,11 +62,11 @@ export default function RightSidebar() {
                 );
             } else {
                 setTrendingTags([
-                    {tag: "Rust", count: 18},
-                    {tag: "Axum", count: 12},
-                    {tag: "GraphQL", count: 9},
-                    {tag: "NextJS", count: 8},
-                    {tag: "DevLife", count: 5},
+                    {tag: "일상", count: 18},
+                    {tag: "사진", count: 12},
+                    {tag: "여행", count: 9},
+                    {tag: "트렌드", count: 8},
+                    {tag: "음악", count: 5},
                 ]);
             }
         } catch (err) {
@@ -413,10 +413,8 @@ export default function RightSidebar() {
 
             {/* Footer Info */}
             <div style={{fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.6", padding: "0 6px"}}>
-                <span>© 2026 Ferro. Rust 2024 & Next.js 15.</span>
+                <span>© 2026 Ferro</span>
                 <div style={{display: "flex", gap: "10px", marginTop: "4px"}}>
-                    <Link href="/welcome" style={{color: "var(--text-secondary)"}}>소개</Link>
-                    <span>·</span>
                     <Link href="/explore" style={{color: "var(--text-secondary)"}}>탐색</Link>
                     <span>·</span>
                     <Link href="/map" style={{color: "var(--text-secondary)"}}>위키맵</Link>

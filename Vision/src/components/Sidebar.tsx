@@ -98,7 +98,6 @@ export default function Sidebar() {
                         <div className="logo-badge">🦀</div>
                         <div className="logo-text">
                             Ferro
-                            <span className="logo-subtext">Vision SNS</span>
                         </div>
                     </Link>
 
@@ -186,15 +185,6 @@ export default function Sidebar() {
                             </>
                         )}
 
-                        {/* Welcome / Landing page link */}
-                        <Link
-                            href="/welcome"
-                            className={`nav-item ${pathname === "/welcome" ? "active" : ""}`}
-                        >
-                            <Sparkles size={20} color="#a855f7"/>
-                            <span>소개 & 가입</span>
-                        </Link>
-
                         {/* Quick Actions for logged in user */}
                         {user && (
                             <button
@@ -231,17 +221,6 @@ export default function Sidebar() {
                                     <LogIn size={18}/>
                                     <span>로그인 / 가입</span>
                                 </button>
-                                <Link
-                                    href="/welcome"
-                                    className="btn-secondary"
-                                    style={{
-                                        width: "100%",
-                                        justifyContent: "center",
-                                        borderRadius: "var(--radius-full)",
-                                    }}
-                                >
-                                    <Globe size={15}/> 랜딩 페이지 보기
-                                </Link>
                             </div>
                         )}
                     </nav>

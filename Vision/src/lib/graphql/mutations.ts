@@ -68,6 +68,7 @@ export const MUTATIONS = {
 
     UPDATE_PROFILE: `
     mutation UpdateProfile(
+      $username: String
       $displayName: String
       $bio: String
       $avatarUrl: String
@@ -76,6 +77,7 @@ export const MUTATIONS = {
       $website: String
     ) {
       updateUserProfile(
+        username: $username
         displayName: $displayName
         bio: $bio
         avatarUrl: $avatarUrl

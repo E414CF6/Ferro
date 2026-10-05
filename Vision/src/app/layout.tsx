@@ -8,7 +8,7 @@ import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
     title: "Ferro — Stay Connected & Express in Real-Time",
-    description: "Modern, high-performance social networking platform built with Rust and Next.js 15.",
+    description: "Modern, high-performance social networking platform.",
 };
 
 export default function RootLayout({

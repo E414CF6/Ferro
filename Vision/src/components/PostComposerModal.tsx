@@ -446,7 +446,7 @@ export default function PostComposerModal({
 
                     {/* Tags Chips */}
                     <div style={{display: "flex", gap: "6px", flexWrap: "wrap"}}>
-                        {["Rust", "GraphQL", "PostgreSQL", "NextJS", "DevLife"].map((tag) => (
+                        {["일상", "소통", "사진", "생각", "트렌드"].map((tag) => (
                             <button
                                 key={tag}
                                 type="button"

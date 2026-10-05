@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { HashtagTrend, Post, User } from "@/lib/types";
@@ -20,15 +20,6 @@ import {
     Users,
     X,
 } from "lucide-react";
-
-const CATEGORIES = [
-    { id: "all", label: "전체", query: "" },
-    { id: "rust", label: "🦀 Rust 개발", query: "Rust" },
-    { id: "graphql", label: "⚡ GraphQL", query: "GraphQL" },
-    { id: "postgres", label: "🐘 PostgreSQL", query: "PostgreSQL" },
-    { id: "design", label: "🎨 UI/UX 디자인", query: "Design" },
-    { id: "trending", label: "🔥 최신 트렌드", query: "NextJS" },
-];
 
 function ExploreContent() {
     const { user } = useAuth();
@@ -118,15 +109,30 @@ function ExploreContent() {
         loadUsersAndTrends();
     }, [initialQuery, handleSearch, loadUsersAndTrends]);
 
+    // Dynamically derive real-time keyword filters from backend trending hashtags
+    const dynamicKeywords = useMemo(() => {
+        const list = [{ id: "all", label: "전체", query: "" }];
+        if (trendingHashtags && trendingHashtags.length > 0) {
+            trendingHashtags.forEach((t) => {
+                list.push({
+                    id: t.hashtag,
+                    label: `#${t.hashtag}`,
+                    query: `#${t.hashtag}`,
+                });
+            });
+        }
+        return list;
+    }, [trendingHashtags]);
+
     const onSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         handleSearch(query);
     };
 
-    const handleCategoryClick = (cat: typeof CATEGORIES[0]) => {
-        setSelectedCategory(cat.id);
-        setQuery(cat.query);
-        handleSearch(cat.query);
+    const handleKeywordClick = (kw: { id: string; label: string; query: string }) => {
+        setSelectedCategory(kw.id);
+        setQuery(kw.query);
+        handleSearch(kw.query);
     };
 
     const handleFollowToggle = async (targetUser: User) => {
@@ -189,7 +195,7 @@ function ExploreContent() {
                     />
                     <input
                         type="text"
-                        placeholder="키워드, 해시태그(#), 기술 스택으로 검색..."
+                        placeholder="키워드, 해시태그(#), 닉네임으로 검색..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         style={{
@@ -224,16 +230,16 @@ function ExploreContent() {
                     )}
                 </form>
 
-                {/* Category Pills */}
+                {/* Real-time Dynamic Keywords */}
                 <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "2px", scrollbarWidth: "none" }}>
-                    {CATEGORIES.map((cat) => (
+                    {dynamicKeywords.map((kw) => (
                         <button
-                            key={cat.id}
-                            onClick={() => handleCategoryClick(cat)}
-                            className={`header-tab-pill ${selectedCategory === cat.id ? "active" : ""}`}
+                            key={kw.id}
+                            onClick={() => handleKeywordClick(kw)}
+                            className={`header-tab-pill ${selectedCategory === kw.id ? "active" : ""}`}
                             style={{ flexShrink: 0, fontSize: "12px", padding: "5px 12px" }}
                         >
-                            {cat.label}
+                            {kw.label}
                         </button>
                     ))}
                 </div>

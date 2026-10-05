@@ -109,7 +109,7 @@ export default function NewGroupModal({ onClose, onGroupCreated }: NewGroupModal
                         </label>
                         <input
                             type="text"
-                            placeholder="예: Ferro Rust 스터디 그룹, 프로젝트 회의"
+                            placeholder="예: 프로젝트 팀, 스터디 모임, 소모임"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             className="composer-textarea"

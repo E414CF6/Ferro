@@ -158,11 +158,11 @@ export default function HomePage() {
                         </div>
                     </div>
                     <Link
-                        href="/welcome"
+                        href="/signup"
                         className="btn-primary"
                         style={{padding: "7px 16px", fontSize: "12px"}}
                     >
-                        소개 & 가입하기 <ArrowRight size={13}/>
+                        가입하기 <ArrowRight size={13}/>
                     </Link>
                 </div>
             )}

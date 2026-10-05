@@ -135,12 +135,12 @@ export default function AuthModal({onClose}: AuthModalProps) {
                         </div>
                         <div>
                             <h2 className="modal-title" style={{fontSize: "18px"}}>
-                                {tab === "login" ? "Ferro 로그인" : "새 계정 만들기"}
+                                {tab === "login" ? "로그인" : "회원가입"}
                             </h2>
                             <p style={{fontSize: "12px", color: "var(--text-muted)"}}>
                                 {tab === "login"
                                     ? "계정에 로그인하여 피드와 스토리를 확인하세요"
-                                    : "모던 실시간 SNS 커뮤니티에 참여하세요"}
+                                    : "새로운 계정을 생성하세요"}
                             </p>
                         </div>
                     </div>
@@ -273,39 +273,6 @@ export default function AuthModal({onClose}: AuthModalProps) {
                         /* Signup Form */
                         <form onSubmit={handleSignupSubmit}
                               style={{display: "flex", flexDirection: "column", gap: "14px"}}>
-                            {/* Avatar Preview */}
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "14px",
-                                    padding: "12px",
-                                    borderRadius: "var(--radius-md)",
-                                    backgroundColor: "var(--bg-input)",
-                                    border: "1px solid var(--border-subtle)",
-                                }}
-                            >
-                                <img
-                                    src={generatedAvatar}
-                                    alt="Avatar Preview"
-                                    style={{
-                                        width: 52,
-                                        height: 52,
-                                        borderRadius: "50%",
-                                        objectFit: "cover",
-                                        border: "2px solid var(--accent-primary)",
-                                    }}
-                                />
-                                <div style={{flex: 1, minWidth: 0}}>
-                                    <div style={{fontSize: "13px", fontWeight: 700, color: "var(--text-primary)"}}>
-                                        프로필 아바타 미리보기
-                                    </div>
-                                    <div style={{fontSize: "11px", color: "var(--text-muted)", marginTop: "2px"}}>
-                                        아이디에 맞춰 고유 로봇 아바타가 자동 생성됩니다.
-                                    </div>
-                                </div>
-                            </div>
-
                             <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px"}}>
                                 <div className="form-group" style={{marginBottom: 0}}>
                                     <label className="form-label">아이디 (영문/숫자/_) *</label>
@@ -432,18 +399,6 @@ export default function AuthModal({onClose}: AuthModalProps) {
                                 </div>
                             )}
 
-                            <div className="form-group" style={{marginBottom: 0}}>
-                                <label className="form-label">한 줄 소개 (선택)</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="예: Rust 백엔드 개발자"
-                                    value={signupBio}
-                                    onChange={(e) => setSignupBio(e.target.value)}
-                                    maxLength={160}
-                                />
-                            </div>
-
                             <button
                                 type="submit"
                                 disabled={
@@ -459,7 +414,7 @@ export default function AuthModal({onClose}: AuthModalProps) {
                                 style={{width: "100%", padding: "12px", marginTop: "6px"}}
                             >
                                 <UserPlus size={16}/>
-                                {loading ? "가입 처리 중..." : "회원가입 완료"}
+                                {loading ? "가입 처리 중..." : "회원가입"}
                             </button>
 
                             <div style={{textAlign: "center", fontSize: "13px", color: "var(--text-secondary)"}}>

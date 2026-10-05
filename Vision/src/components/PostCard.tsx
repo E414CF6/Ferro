@@ -989,7 +989,7 @@ export default function PostCard({ post, onPostDeleted, onPostUpdated }: PostCar
                                 </form>
                             ) : (
                                 <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "4px" }}>
-                                    <Link href="/welcome?tab=login" style={{ color: "var(--accent-primary)" }}>
+                                    <Link href="/login" style={{ color: "var(--accent-primary)" }}>
                                         로그인
                                     </Link> 후 댓글을 작성할 수 있습니다.
                                 </div>

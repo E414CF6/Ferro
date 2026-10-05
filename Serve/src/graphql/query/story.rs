@@ -27,7 +27,10 @@ impl StoryQuery {
 
     /// Stories tray/feed: returns all active stories from followed users and self
     async fn stories_feed(&self, ctx: &Context<'_>, user_id: Option<ID>) -> Result<Vec<StoryGql>> {
-        let uid = resolve_user_id(ctx, user_id)?;
+        let uid = match resolve_user_id(ctx, user_id) {
+            Ok(uid) => uid,
+            Err(_) => return Ok(vec![]),
+        };
         let db = ctx.data::<Database>()?;
         let stories = db.get_stories_feed_for_user(uid).await;
         Ok(stories.into_iter().map(StoryGql).collect())

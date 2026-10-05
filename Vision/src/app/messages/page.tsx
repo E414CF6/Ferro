@@ -405,7 +405,7 @@ function MessagesContent() {
                 <p style={{ color: "var(--text-secondary)", fontSize: "14px", marginBottom: "20px" }}>
                     다른 사용자와 실시간 1:1 및 그룹 대화를 나눌 수 있습니다.
                 </p>
-                <Link href="/welcome?tab=login" className="btn-primary" style={{ display: "inline-flex" }}>
+                <Link href="/login" className="btn-primary" style={{ display: "inline-flex" }}>
                     로그인하기
                 </Link>
             </div>
