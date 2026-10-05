@@ -24,7 +24,7 @@ export default function SignupPage() {
 
     useEffect(() => {
         if (user) {
-            router.push("/");
+            router.replace("/");
         }
     }, [user, router]);
 
@@ -68,7 +68,7 @@ export default function SignupPage() {
                 displayName: cleanDisplayName,
             });
             showToast(`환영합니다! @${cleanUsername} 계정이 생성되었습니다.`, "success");
-            router.push("/");
+            router.replace("/");
         } catch (err: any) {
             showToast(formatErrorMessage(err, "ko"), "error");
         } finally {
@@ -77,46 +77,19 @@ export default function SignupPage() {
     };
 
     return (
-        <div
-            style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "20px",
-                backgroundColor: "var(--bg-primary)",
-            }}
-        >
-            <div
-                style={{
-                    width: "100%",
-                    maxWidth: "460px",
-                    backgroundColor: "var(--bg-card)",
-                    borderRadius: "var(--radius-lg)",
-                    border: "1px solid var(--border-subtle)",
-                    padding: "36px 30px",
-                    boxShadow: "var(--shadow-lg)",
-                }}
-            >
-                {/* Brand Header */}
-                <div style={{ textAlign: "center", marginBottom: "26px" }}>
-                    <Link
-                        href="/"
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "10px",
-                            textDecoration: "none",
-                            marginBottom: "16px",
-                        }}
-                    >
+        <div className="auth-page-wrapper">
+            <div className="auth-split-container">
+                {/* Left: Signup Modal Card */}
+                <div className="auth-form-card signup-card">
+                    {/* Brand Header */}
+                    <div style={{ textAlign: "center", marginBottom: "26px" }}>
                         <div
                             className="logo-badge"
                             style={{
-                                width: "40px",
-                                height: "40px",
+                                width: "42px",
+                                height: "42px",
                                 fontSize: "20px",
-                                display: "flex",
+                                display: "inline-flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 borderRadius: "10px",
@@ -124,28 +97,18 @@ export default function SignupPage() {
                                 border: "1px solid var(--border-subtle)",
                                 color: "#fff",
                                 fontWeight: 900,
+                                marginBottom: "12px",
                             }}
                         >
                             F
                         </div>
-                        <span
-                            style={{
-                                fontSize: "24px",
-                                fontWeight: 800,
-                                color: "var(--text-primary)",
-                                letterSpacing: "-0.5px",
-                            }}
-                        >
-                            Ferro
-                        </span>
-                    </Link>
-                    <h1 style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
-                        회원가입
-                    </h1>
-                    <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "6px", marginBottom: 0 }}>
-                        새로운 계정을 생성하세요
-                    </p>
-                </div>
+                        <h1 style={{ fontSize: "22px", fontWeight: 800, color: "var(--text-primary)", margin: 0, letterSpacing: "-0.5px" }}>
+                            회원가입
+                        </h1>
+                        <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "6px", marginBottom: 0 }}>
+                            새로운 계정을 생성하세요
+                        </p>
+                    </div>
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -362,20 +325,21 @@ export default function SignupPage() {
                     >
                         로그인
                     </Link>
-                    <div style={{ marginTop: "12px" }}>
-                        <Link
-                            href="/"
-                            style={{
-                                color: "var(--text-muted)",
-                                fontSize: "12px",
-                                textDecoration: "none",
-                            }}
-                        >
-                            ← 피드로 돌아가기
-                        </Link>
-                    </div>
                 </div>
             </div>
+
+            {/* Right: Modal-sized 'F' Brand Card */}
+            <div className="auth-brand-card signup-card" aria-hidden="true">
+                <div className="auth-brand-glow" />
+                <div className="auth-brand-logo-text">F</div>
+                <div className="auth-brand-title">Ferro</div>
+            </div>
         </div>
+
+        {/* Bottom Center Minimal Footer */}
+        <footer className="auth-footer">
+            © 2026 Ferro
+        </footer>
+    </div>
     );
 }
