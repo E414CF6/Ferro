@@ -66,7 +66,7 @@ pub fn create_jwt(
     };
 
     encode(
-        &Header::default(),
+        &Header::new(jsonwebtoken::Algorithm::HS256),
         &claims,
         &EncodingKey::from_secret(secret.as_bytes()),
     )
@@ -80,10 +80,13 @@ pub fn create_jwt(
 }
 
 pub fn verify_jwt(token: &str, secret: &str) -> Result<AuthUser, DomainError> {
+    let mut validation = Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.validate_exp = true;
+
     let token_data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
-        &Validation::default(),
+        &validation,
     )
     .map_err(|e| {
         tracing::debug!(target: "serve::auth", error = %e, "JWT token validation failed");

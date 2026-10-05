@@ -103,26 +103,40 @@ impl Default for RateLimiter {
     }
 }
 
-/// Helper to extract client IP from HTTP headers or ConnectInfo
-pub fn extract_client_ip(headers: &HeaderMap, connect_info: Option<&SocketAddr>) -> String {
-    if let Some(cf_ip) = headers
-        .get("cf-connecting-ip")
-        .and_then(|v| v.to_str().ok())
-    {
-        return cf_ip.trim().to_string();
-    }
+use axum::extract::ConnectInfo;
 
-    if let Some(xfwd) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
-        if let Some(first_ip) = xfwd.split(',').next() {
-            let trimmed = first_ip.trim();
+/// Helper to extract client IP from HTTP headers or ConnectInfo, respecting trust_proxy configuration
+pub fn extract_client_ip(
+    headers: &HeaderMap,
+    connect_info: Option<&SocketAddr>,
+    trust_proxy: bool,
+) -> String {
+    if trust_proxy {
+        if let Some(cf_ip) = headers
+            .get("cf-connecting-ip")
+            .and_then(|v| v.to_str().ok())
+        {
+            let trimmed = cf_ip.trim();
             if !trimmed.is_empty() {
                 return trimmed.to_string();
             }
         }
-    }
 
-    if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
-        return real_ip.trim().to_string();
+        if let Some(xfwd) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            if let Some(first_ip) = xfwd.split(',').next() {
+                let trimmed = first_ip.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
+            }
+        }
+
+        if let Some(real_ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+            let trimmed = real_ip.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
+            }
+        }
     }
 
     if let Some(addr) = connect_info {
@@ -156,7 +170,8 @@ pub async fn rate_limit_middleware(
     }
 
     let headers = req.headers();
-    let client_ip = extract_client_ip(headers, None);
+    let connect_info = req.extensions().get::<ConnectInfo<SocketAddr>>().map(|ci| ci.0);
+    let client_ip = extract_client_ip(headers, connect_info.as_ref(), config.rate_limit.trust_proxy);
 
     let (allowed, remaining, reset_after) = rate_limiter.check(&client_ip).await;
 

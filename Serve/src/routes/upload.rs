@@ -41,16 +41,6 @@ pub fn validate_image_magic_bytes(data: &[u8]) -> Option<(&'static str, &'static
         return Some(("webp", "image/webp"));
     }
 
-    // SVG: Look for <svg or <?xml ... <svg in the first 512 bytes
-    let preview_len = data.len().min(512);
-    if let Ok(preview) = std::str::from_utf8(&data[0..preview_len]) {
-        let trimmed = preview.trim_start();
-        if trimmed.starts_with("<svg") || (trimmed.starts_with("<?xml") && trimmed.contains("<svg"))
-        {
-            return Some(("svg", "image/svg+xml"));
-        }
-    }
-
     None
 }
 
@@ -161,7 +151,7 @@ pub async fn upload_file_handler(
                         StatusCode::BAD_REQUEST,
                         Json(json!({
                             "error": "INVALID_FILE_SIGNATURE",
-                            "message": "Uploaded file content does not match allowed image signatures (JPEG, PNG, GIF, WEBP, SVG)"
+                            "message": "Uploaded file content does not match allowed image signatures (JPEG, PNG, GIF, WEBP)"
                         })),
                     );
                 }

@@ -1,10 +1,11 @@
 use axum::{
     extract::Extension,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Json},
 };
 use serde_json::json;
 
+use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::db::postgres::{Database, DatabaseBackend};
 
 /// Liveness probe: returns 200 OK if server process is running
@@ -91,8 +92,34 @@ pub async fn readiness_handler(Extension(db): Extension<Database>) -> impl IntoR
     }
 }
 
-/// Prometheus metrics endpoint
-pub async fn metrics_handler(Extension(db): Extension<Database>) -> impl IntoResponse {
+/// Prometheus metrics endpoint (optionally protected by METRICS_AUTH_TOKEN)
+pub async fn metrics_handler(
+    Extension(db): Extension<Database>,
+    Extension(config): Extension<AppConfig>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if let Some(ref expected_token) = config.server.metrics_token {
+        let auth_valid = headers
+            .get("Authorization")
+            .and_then(|h| h.to_str().ok())
+            .map(|h| {
+                let token = h
+                    .strip_prefix("Bearer ")
+                    .or_else(|| h.strip_prefix("bearer "))
+                    .unwrap_or(h);
+                token.trim() == expected_token
+            })
+            .unwrap_or(false);
+
+        if !auth_valid {
+            return (
+                StatusCode::UNAUTHORIZED,
+                [("content-type", "text/plain; version=0.0.4; charset=utf-8")],
+                "# Error: Unauthorized access to /metrics (invalid or missing bearer token)\n"
+                    .to_string(),
+            );
+        }
+    }
     let (pool_size, pool_idle, pool_active) = match db.backend() {
         DatabaseBackend::Postgres(pool) => {
             let size = pool.size();

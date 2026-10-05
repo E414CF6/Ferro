@@ -54,6 +54,8 @@ impl Database {
                     })?
                     .create_if_missing(true)
                     .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+                    .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+                    .busy_timeout(std::time::Duration::from_secs(5))
                     .foreign_keys(true);
 
                 let pool = SqlitePoolOptions::new()
@@ -61,6 +63,7 @@ impl Database {
                     .min_connections(config.min_connections)
                     .acquire_timeout(std::time::Duration::from_secs(config.acquire_timeout_secs))
                     .idle_timeout(std::time::Duration::from_secs(config.idle_timeout_secs))
+                    .max_lifetime(std::time::Duration::from_secs(config.max_lifetime_secs))
                     .connect_with(opts)
                     .await
                     .map_err(|e| {
@@ -88,6 +91,7 @@ impl Database {
                     target: "serve::db",
                     max_connections = config.max_connections,
                     min_connections = config.min_connections,
+                    max_lifetime = config.max_lifetime_secs,
                     "Connecting to PostgreSQL database pool..."
                 );
                 let pool = PgPoolOptions::new()
@@ -95,6 +99,7 @@ impl Database {
                     .min_connections(config.min_connections)
                     .acquire_timeout(std::time::Duration::from_secs(config.acquire_timeout_secs))
                     .idle_timeout(std::time::Duration::from_secs(config.idle_timeout_secs))
+                    .max_lifetime(std::time::Duration::from_secs(config.max_lifetime_secs))
                     .connect(&config.url)
                     .await
                     .map_err(|e| {

@@ -54,6 +54,8 @@ pub struct ServerConfig {
     pub enable_introspection: bool,
     pub graphiql_path: String,
     pub graphql_path: String,
+    pub request_timeout_secs: u64,
+    pub metrics_token: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -66,6 +68,8 @@ impl Default for ServerConfig {
             enable_introspection: true,
             graphiql_path: "/graphiql".to_string(),
             graphql_path: "/graphql".to_string(),
+            request_timeout_secs: 30,
+            metrics_token: None,
         }
     }
 }
@@ -129,6 +133,7 @@ pub struct DatabaseConfig {
     pub connect_timeout_secs: u64,
     pub acquire_timeout_secs: u64,
     pub idle_timeout_secs: u64,
+    pub max_lifetime_secs: u64,
     pub auto_migrate: bool,
     pub seed_data: bool,
 }
@@ -144,6 +149,7 @@ impl Default for DatabaseConfig {
             connect_timeout_secs: 10,
             acquire_timeout_secs: 15,
             idle_timeout_secs: 600,
+            max_lifetime_secs: 1800,
             auto_migrate: true,
             seed_data: false,
         }
@@ -277,6 +283,7 @@ pub struct RateLimitConfig {
     pub max_requests: usize,
     pub window_secs: u64,
     pub enabled: bool,
+    pub trust_proxy: bool,
 }
 
 impl Default for RateLimitConfig {
@@ -285,6 +292,7 @@ impl Default for RateLimitConfig {
             max_requests: 120,
             window_secs: 60,
             enabled: true,
+            trust_proxy: true,
         }
     }
 }
@@ -368,6 +376,14 @@ impl AppConfig {
 
         let graphiql_path = env::var("GRAPHIQL_PATH").unwrap_or_else(|_| "/graphiql".to_string());
         let graphql_path = env::var("GRAPHQL_PATH").unwrap_or_else(|_| "/graphql".to_string());
+        let request_timeout_secs: u64 = env::var("REQUEST_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(30);
+        let metrics_token = env::var("METRICS_AUTH_TOKEN")
+            .ok()
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty());
 
         let server = ServerConfig {
             host,
@@ -377,6 +393,8 @@ impl AppConfig {
             enable_introspection,
             graphiql_path,
             graphql_path,
+            request_timeout_secs,
+            metrics_token,
         };
 
         let driver_env = env::var("DATABASE_DRIVER")
@@ -432,6 +450,10 @@ impl AppConfig {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(600);
+        let max_lifetime_secs: u64 = env::var("DB_MAX_LIFETIME_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1800);
         let auto_migrate = env::var("DB_AUTO_MIGRATE")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(true);
@@ -448,6 +470,7 @@ impl AppConfig {
             connect_timeout_secs,
             acquire_timeout_secs,
             idle_timeout_secs,
+            max_lifetime_secs,
             auto_migrate,
             seed_data,
         };
@@ -486,10 +509,10 @@ impl AppConfig {
             "ferro-development-secret-key-do-not-use-in-production-32bytes!".to_string()
         });
 
-        if env.is_production() && (jwt_secret.contains("development") || jwt_secret.len() < 32) {
+        if env.is_production() && (jwt_secret.contains("development") || jwt_secret.len() < 32 || jwt_secret == "PROD") {
             warn!(
                 target: "serve::config",
-                "SECURITY WARNING: Default or weak JWT_SECRET is being used in PRODUCTION! Please set a strong JWT_SECRET environment variable."
+                "SECURITY WARNING: Default, short, or weak JWT_SECRET is being used in PRODUCTION! Please set a strong random JWT_SECRET (at least 32 characters)."
             );
         }
 
@@ -514,11 +537,16 @@ impl AppConfig {
         let rate_limit_enabled = env::var("RATE_LIMIT_ENABLED")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(true);
+        let trust_proxy = env::var("TRUST_PROXY_HEADERS")
+            .or_else(|_| env::var("TRUST_PROXIES"))
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(true);
 
         let rate_limit = RateLimitConfig {
             max_requests: rate_limit_max,
             window_secs: rate_limit_window,
             enabled: rate_limit_enabled,
+            trust_proxy,
         };
 
         let allowed_origins = env::var("CORS_ALLOWED_ORIGINS")
@@ -562,10 +590,13 @@ impl AppConfig {
             sqlite_path = %self.database.sqlite_path,
             storage_driver = %self.storage.driver.as_str(),
             max_connections = %self.database.max_connections,
+            max_lifetime = %format!("{}s", self.database.max_lifetime_secs),
+            request_timeout = %format!("{}s", self.server.request_timeout_secs),
             graphiql_enabled = %self.server.enable_graphiql,
             introspection_enabled = %self.server.enable_introspection,
             rate_limit_enabled = %self.rate_limit.enabled,
-            rate_limit = %format!("{}/{}s", self.rate_limit.max_requests, self.rate_limit.window_secs),
+            rate_limit = %format!("{}/{}s (trust_proxy: {})", self.rate_limit.max_requests, self.rate_limit.window_secs, self.rate_limit.trust_proxy),
+            metrics_protected = %self.server.metrics_token.is_some(),
             "Application configuration initialized"
         );
     }

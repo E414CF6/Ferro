@@ -9,6 +9,8 @@ use tokio_stream::StreamExt;
 use tokio_stream::wrappers::BroadcastStream;
 use uuid::Uuid;
 
+use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+
 pub struct SubscriptionRoot;
 
 #[Subscription]
@@ -33,13 +35,23 @@ impl SubscriptionRoot {
         let broker = ctx.data::<MessageBroker>()?;
         let rx = broker.subscribe_dm();
 
-        let stream = BroadcastStream::new(rx).filter_map(move |item| {
-            if let Ok(msg) = item {
+        let stream = BroadcastStream::new(rx).filter_map(move |item| match item {
+            Ok(msg) => {
                 if msg.recipient_id == target_uid {
-                    return Some(DirectMessageGql(msg));
+                    Some(DirectMessageGql(msg))
+                } else {
+                    None
                 }
             }
-            None
+            Err(BroadcastStreamRecvError::Lagged(missed)) => {
+                tracing::warn!(
+                    target: "serve::subscription",
+                    user_id = %target_uid,
+                    missed_count = missed,
+                    "DM subscription lagged behind; dropped missed messages"
+                );
+                None
+            }
         });
 
         Ok(stream)
@@ -65,13 +77,23 @@ impl SubscriptionRoot {
         let broker = ctx.data::<MessageBroker>()?;
         let rx = broker.subscribe_notification();
 
-        let stream = BroadcastStream::new(rx).filter_map(move |item| {
-            if let Ok(notif) = item {
+        let stream = BroadcastStream::new(rx).filter_map(move |item| match item {
+            Ok(notif) => {
                 if notif.recipient_id == target_uid {
-                    return Some(NotificationGql(notif));
+                    Some(NotificationGql(notif))
+                } else {
+                    None
                 }
             }
-            None
+            Err(BroadcastStreamRecvError::Lagged(missed)) => {
+                tracing::warn!(
+                    target: "serve::subscription",
+                    user_id = %target_uid,
+                    missed_count = missed,
+                    "Notification subscription lagged behind; dropped missed notifications"
+                );
+                None
+            }
         });
 
         Ok(stream)
@@ -117,19 +139,28 @@ impl SubscriptionRoot {
         let broker = ctx.data::<MessageBroker>()?;
         let rx = broker.subscribe_typing();
 
-        let stream = BroadcastStream::new(rx).filter_map(move |item| {
-            let event = item.ok()?;
-            if let Some(cid) = target_cid {
-                if event.conversation_id == Some(cid) {
-                    return Some(TypingEventGql(event));
+        let stream = BroadcastStream::new(rx).filter_map(move |item| match item {
+            Ok(event) => {
+                if let Some(cid) = target_cid {
+                    if event.conversation_id == Some(cid) {
+                        return Some(TypingEventGql(event));
+                    }
                 }
-            }
-            if let Some(rid) = target_rid {
-                if event.recipient_id == Some(rid) {
-                    return Some(TypingEventGql(event));
+                if let Some(rid) = target_rid {
+                    if event.recipient_id == Some(rid) {
+                        return Some(TypingEventGql(event));
+                    }
                 }
+                None
             }
-            None
+            Err(BroadcastStreamRecvError::Lagged(missed)) => {
+                tracing::debug!(
+                    target: "serve::subscription",
+                    missed_count = missed,
+                    "Typing indicator subscription lagged behind; dropped events"
+                );
+                None
+            }
         });
 
         Ok(stream)

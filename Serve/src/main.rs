@@ -70,10 +70,13 @@ async fn main() {
         .await
         .unwrap_or_else(|e| panic!("Failed to bind to address {}: {}", addr, e));
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .unwrap();
 }
 
 async fn shutdown_signal() {

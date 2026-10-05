@@ -37,15 +37,15 @@ services:
     container_name: serve-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: serve
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: serve
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-serve}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-serve}
+    expose:
+      - "5432"
     volumes:
       - serve_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U serve -d serve" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-serve} -d ${POSTGRES_DB:-serve}" ]
       interval: 5s
       timeout: 3s
       retries: 5

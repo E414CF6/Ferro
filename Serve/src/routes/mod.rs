@@ -55,10 +55,12 @@ pub fn create_router(schema: SnsSchema, db: Database, config: AppConfig) -> Rout
     create_router_with_state(state)
 }
 
+use tower_http::timeout::TimeoutLayer;
+
 pub fn create_router_with_state(state: AppState) -> Router {
     let ws_path = format!("{}/ws", state.config.server.graphql_path);
 
-    let mut router = Router::new()
+    let mut http_routes = Router::new()
         // Health check & Metrics endpoints
         .route("/health", get(health::liveness_handler))
         .route("/health/live", get(health::liveness_handler))
@@ -68,20 +70,32 @@ pub fn create_router_with_state(state: AppState) -> Router {
         .route("/api/upload", post(upload::upload_file_handler))
         // Static uploads directory serving
         .nest_service("/uploads", ServeDir::new(&state.config.storage.local_path))
-        // GraphQL API HTTP & WebSocket endpoints
+        // GraphQL API HTTP POST endpoint
         .route(
             &state.config.server.graphql_path,
             post(graphql::graphql_handler),
-        )
-        .route(&ws_path, get(graphql::graphql_ws_handler));
+        );
 
     // GraphiQL IDE endpoint (enabled in development or explicitly configured)
     if state.config.server.enable_graphiql {
-        router = router.route("/", get(graphql::graphiql_handler)).route(
-            &state.config.server.graphiql_path,
-            get(graphql::graphiql_handler),
-        );
+        http_routes = http_routes
+            .route("/", get(graphql::graphiql_handler))
+            .route(
+                &state.config.server.graphiql_path,
+                get(graphql::graphiql_handler),
+            );
     }
+
+    // Apply request timeout to HTTP routes to prevent hung connections (returns 408 Request Timeout)
+    let http_with_timeout = http_routes.layer(TimeoutLayer::with_status_code(
+        axum::http::StatusCode::REQUEST_TIMEOUT,
+        Duration::from_secs(state.config.server.request_timeout_secs),
+    ));
+
+    // WebSocket route is kept free of HTTP timeout layer to support long-lived subscriptions
+    let ws_routes = Router::new().route(&ws_path, get(graphql::graphql_ws_handler));
+
+    let mut router = http_with_timeout.merge(ws_routes);
 
     // Configure CORS layer
     let cors = if state.config.cors.allows_any() {
@@ -103,14 +117,14 @@ pub fn create_router_with_state(state: AppState) -> Router {
             .allow_headers(Any)
     };
 
-    router
+    router = router
         .layer(middleware::from_fn(rate_limit_middleware))
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024)) // 10MB request body limit
         .layer(Extension(state.schema))
         .layer(Extension(state.db))
         .layer(Extension(state.storage))
         .layer(Extension(state.rate_limiter))
-        .layer(Extension(state.config))
+        .layer(Extension(state.config.clone()))
         .layer(cors)
         .layer(SetResponseHeaderLayer::overriding(
             header::X_CONTENT_TYPE_OPTIONS,
@@ -124,6 +138,20 @@ pub fn create_router_with_state(state: AppState) -> Router {
             header::REFERRER_POLICY,
             HeaderValue::from_static("strict-origin-when-cross-origin"),
         ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("geolocation=(), camera=(), microphone=(), payment=()"),
+        ));
+
+    // In production, enforce Strict-Transport-Security (HSTS)
+    if state.config.server.env.is_production() {
+        router = router.layer(SetResponseHeaderLayer::overriding(
+            header::STRICT_TRANSPORT_SECURITY,
+            HeaderValue::from_static("max-age=31536000; includeSubDomains; preload"),
+        ));
+    }
+
+    router
         .layer(create_propagate_request_id_layer())
         .layer(create_http_trace_layer())
         .layer(create_request_id_layer())
