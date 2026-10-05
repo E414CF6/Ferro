@@ -54,8 +54,25 @@ export default function PostComposer({ onPostCreated }: PostComposerProps) {
             return;
         }
 
+        const validFiles = fileList.filter((file) => {
+            const isImage =
+                file.type.startsWith("image/") ||
+                /\.(heic|heif|avif|jpe?g|png|gif|webp)$/i.test(file.name);
+            if (!isImage) {
+                showToast("이미지 파일만 첨부할 수 있습니다.", "error");
+                return false;
+            }
+            if (file.size > 50 * 1024 * 1024) {
+                showToast("각 이미지는 최대 50MB까지 업로드 가능합니다.", "error");
+                return false;
+            }
+            return true;
+        });
+
+        if (validFiles.length === 0) return;
+
         setUploadingImage(true);
-        for (const file of fileList) {
+        for (const file of validFiles) {
             try {
                 const uploadedUrl = await uploadMedia(file);
                 setAttachedImages((prev) => [...prev, uploadedUrl]);
@@ -366,7 +383,7 @@ export default function PostComposer({ onPostCreated }: PostComposerProps) {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.heic,.heif,.avif"
                             multiple
                             style={{ display: "none" }}
                             onChange={(e) => {

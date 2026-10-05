@@ -119,7 +119,7 @@ pub fn create_router_with_state(state: AppState) -> Router {
 
     router = router
         .layer(middleware::from_fn(rate_limit_middleware))
-        .layer(DefaultBodyLimit::max(10 * 1024 * 1024)) // 10MB request body limit
+        .layer(DefaultBodyLimit::max(100 * 1024 * 1024)) // 100MB request body limit to support up to 50MB file uploads
         .layer(Extension(state.schema))
         .layer(Extension(state.db))
         .layer(Extension(state.storage))

@@ -17,6 +17,7 @@ import {
     MapPin,
     MessageCircle,
     PlusCircle,
+    Search,
     Sparkles,
     User as UserIcon,
 } from "lucide-react";
@@ -120,11 +121,11 @@ export default function Sidebar() {
                         </Link>
 
                         <Link
-                            href="/map"
-                            className={`nav-item ${pathname === "/map" ? "active" : ""}`}
+                            href="/?tab=map"
+                            className="nav-item"
                         >
-                            <MapPin size={20} color="#ec4899"/>
-                            <span>위키 맵 (wMap)</span>
+                            <MapPin size={20} color="#38bdf8"/>
+                            <span>지도 피드 (Map)</span>
                         </Link>
 
                         {user && (
@@ -309,77 +310,89 @@ export default function Sidebar() {
                 ) : null}
             </aside>
 
-            {/* Mobile Bottom Navigation */}
+            {/* Mobile Bottom Navigation (Pill Floating Menu) */}
             <nav className="mobile-bottom-nav">
                 <Link
                     href="/"
                     className={`mobile-nav-item ${pathname === "/" ? "active" : ""}`}
+                    aria-label="홈"
                 >
                     <Home size={22}/>
-                    <span>홈</span>
                 </Link>
                 <Link
                     href="/explore"
                     className={`mobile-nav-item ${pathname === "/explore" ? "active" : ""}`}
+                    aria-label="탐색"
                 >
                     <Compass size={22}/>
-                    <span>탐색</span>
                 </Link>
                 <Link
-                    href="/map"
-                    className={`mobile-nav-item ${pathname === "/map" ? "active" : ""}`}
+                    href="/messages"
+                    className={`mobile-nav-item ${pathname === "/messages" ? "active" : ""}`}
+                    aria-label="메시지"
                 >
-                    <MapPin size={22} color="#ec4899"/>
-                    <span>위키맵</span>
+                    <MessageCircle size={22}/>
+                    {unreadDmCount > 0 && (
+                        <span
+                            className="badge-count"
+                            style={{
+                                position: "absolute",
+                                top: 8,
+                                right: 8,
+                                width: "7px",
+                                height: "7px",
+                                minWidth: 0,
+                                padding: 0,
+                                borderRadius: "50%",
+                            }}
+                        />
+                    )}
+                </Link>
+                <Link
+                    href="/search"
+                    className={`mobile-nav-item ${pathname === "/search" ? "active" : ""}`}
+                    aria-label="검색"
+                >
+                    <Search size={22}/>
                 </Link>
                 {user ? (
-                    <>
-                        <button
-                            onClick={() => setShowPostModal(true)}
-                            className="mobile-nav-item"
-                            style={{color: "var(--accent-primary)"}}
-                        >
-                            <PlusCircle size={26}/>
-                            <span>작성</span>
-                        </button>
-                        <Link
-                            href="/notifications"
-                            className={`mobile-nav-item ${
-                                pathname === "/notifications" ? "active" : ""
-                            }`}
-                        >
-                            <Bell size={22}/>
-                            {unreadNotifCount > 0 && (
-                                <span
-                                    className="badge-count"
-                                    style={{
-                                        position: "absolute",
-                                        top: 4,
-                                        right: 12,
-                                    }}
-                                >
-                  {unreadNotifCount}
-                </span>
-                            )}
-                            <span>알림</span>
-                        </Link>
-                        <Link
-                            href={`/profile/${user.username}`}
-                            className={`mobile-nav-item ${
+                    <Link
+                        href={`/profile/${user.username}`}
+                        className={`mobile-nav-item ${
+                            pathname === `/profile/${user.username}` ? "active" : ""
+                        }`}
+                        aria-label="내 프로필"
+                    >
+                        <div
+                            className={`mobile-nav-avatar-frame ${
                                 pathname === `/profile/${user.username}` ? "active" : ""
                             }`}
                         >
-                            <UserIcon size={22}/>
-                            <span>프로필</span>
-                        </Link>
-                    </>
+                            <img
+                                src={
+                                    user.avatarUrl ||
+                                    `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`
+                                }
+                                alt={user.username}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                    display: "block",
+                                }}
+                            />
+                        </div>
+                    </Link>
                 ) : (
                     <button
                         onClick={() => setShowAuthModal(true)}
                         className="mobile-nav-item"
+                        aria-label="로그인"
                     >
-                        <LogIn size={22}/>
-                        <span>로그인</span>
+                        <div className="mobile-nav-avatar-frame">
+                            <UserIcon size={16}/>
+                        </div>
                     </button>
                 )}
             </nav>

@@ -24,12 +24,24 @@ impl PostMutation {
         audience: Option<PostAudienceGql>,
         media: Option<Vec<MediaInput>>,
         poll: Option<CreatePollInput>,
+        quote_post_id: Option<ID>,
     ) -> Result<PostGql> {
         let valid_content =
             crate::domain::validation::validate_post_content(&content).map_err(|e| e.extend())?;
         let aid = resolve_user_id(ctx, author_id)?;
         let db = ctx.data::<Database>()?;
         let aud_model = audience.map(PostAudience::from);
+
+        if let Some(qid_val) = quote_post_id {
+            if !qid_val.as_str().is_empty() {
+                let qid = Uuid::parse_str(qid_val.as_str())?;
+                let post = db
+                    .create_quote_post(aid, qid, valid_content)
+                    .await
+                    .map_err(|e| e.extend())?;
+                return Ok(PostGql(post));
+            }
+        }
 
         let mut post_media_list = Vec::new();
         if let Some(media_inputs) = media {

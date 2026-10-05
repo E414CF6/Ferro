@@ -5,18 +5,30 @@ import {Post, Story} from "@/lib/types";
 import {useAuth} from "@/lib/auth-context";
 import {fetchGraphQL, QUERIES} from "@/lib/graphql";
 import StoryBar from "@/components/StoryBar";
-import PostComposer from "@/components/PostComposer";
+import PostComposerModal from "@/components/PostComposerModal";
 import PostCard from "@/components/PostCard";
-import {ArrowRight, Globe, RefreshCw, Sparkles, UserCheck,} from "lucide-react";
+import MapFeed from "@/components/MapFeed";
+import {ArrowRight, Globe, MapPin, Plus, RefreshCw, Sparkles, UserCheck,} from "lucide-react";
 import Link from "next/link";
 
 export default function HomePage() {
     const {user} = useAuth();
-    const [activeTab, setActiveTab] = useState<"following" | "global">("following");
+    const [activeTab, setActiveTab] = useState<"following" | "global" | "map">("following");
     const [stories, setStories] = useState<Story[]>([]);
     const [posts, setPosts] = useState<Post[]>([]);
     const [loadingPosts, setLoadingPosts] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [showPostModal, setShowPostModal] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get("tab");
+            if (tabParam === "map" || tabParam === "global" || tabParam === "following") {
+                setActiveTab(tabParam as any);
+            }
+        }
+    }, []);
 
     // Load stories
     const loadStories = useCallback(async () => {
@@ -104,6 +116,13 @@ export default function HomePage() {
                                 <Globe size={14}/>
                                 전체 피드
                             </button>
+                            <button
+                                onClick={() => setActiveTab("map")}
+                                className={`header-tab-pill ${activeTab === "map" ? "active" : ""}`}
+                            >
+                                <MapPin size={14}/>
+                                지도 피드
+                            </button>
                         </div>
                     )}
                 </div>
@@ -170,94 +189,115 @@ export default function HomePage() {
             {/* Stories horizontal tray */}
             <StoryBar stories={stories} onRefresh={loadStories}/>
 
-            {/* Post Composer (Only shown to authenticated users) */}
-            <PostComposer onPostCreated={loadPosts}/>
-
-            {/* Posts Feed list */}
-            <div>
-                {loadingPosts ? (
-                    <div style={{padding: "20px"}}>
-                        {[1, 2, 3].map((i) => (
-                            <div
-                                key={i}
-                                style={{
-                                    display: "flex",
-                                    gap: "14px",
-                                    padding: "20px 0",
-                                    borderBottom: "1px solid var(--border-subtle)",
-                                }}
-                            >
+            {activeTab === "map" ? (
+                <MapFeed />
+            ) : (
+                /* Posts Feed list */
+                <div>
+                    {loadingPosts ? (
+                        <div style={{padding: "20px"}}>
+                            {[1, 2, 3].map((i) => (
                                 <div
-                                    className="skeleton"
-                                    style={{width: 44, height: 44, borderRadius: "50%", flexShrink: 0}}
-                                />
-                                <div style={{flex: 1, display: "flex", flexDirection: "column", gap: "10px"}}>
-                                    <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
-                                        <div className="skeleton" style={{width: "120px", height: "16px"}}/>
-                                        <div className="skeleton" style={{width: "80px", height: "14px"}}/>
-                                    </div>
-                                    <div className="skeleton" style={{width: "100%", height: "48px"}}/>
-                                    <div style={{display: "flex", gap: "24px"}}>
-                                        <div className="skeleton" style={{width: "40px", height: "18px"}}/>
-                                        <div className="skeleton" style={{width: "40px", height: "18px"}}/>
+                                    key={i}
+                                    style={{
+                                        display: "flex",
+                                        gap: "14px",
+                                        padding: "20px 0",
+                                        borderBottom: "1px solid var(--border-subtle)",
+                                    }}
+                                >
+                                    <div
+                                        className="skeleton"
+                                        style={{width: 44, height: 44, borderRadius: "50%", flexShrink: 0}}
+                                    />
+                                    <div style={{flex: 1, display: "flex", flexDirection: "column", gap: "10px"}}>
+                                        <div style={{display: "flex", gap: "10px", alignItems: "center"}}>
+                                            <div className="skeleton" style={{width: "120px", height: "16px"}}/>
+                                            <div className="skeleton" style={{width: "80px", height: "14px"}}/>
+                                        </div>
+                                        <div className="skeleton" style={{width: "100%", height: "48px"}}/>
+                                        <div style={{display: "flex", gap: "24px"}}>
+                                            <div className="skeleton" style={{width: "40px", height: "18px"}}/>
+                                            <div className="skeleton" style={{width: "40px", height: "18px"}}/>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : posts.length === 0 ? (
-                    <div
-                        style={{
-                            padding: "60px 20px",
-                            textAlign: "center",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            gap: "14px",
-                        }}
-                    >
+                            ))}
+                        </div>
+                    ) : posts.length === 0 ? (
                         <div
                             style={{
-                                width: 64,
-                                height: 64,
-                                borderRadius: "50%",
-                                backgroundColor: "var(--bg-surface)",
+                                padding: "60px 20px",
+                                textAlign: "center",
                                 display: "flex",
+                                flexDirection: "column",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                color: "var(--accent-primary)",
-                                boxShadow: "var(--shadow-glow)",
+                                gap: "14px",
                             }}
                         >
-                            <Sparkles size={30}/>
-                        </div>
-                        <h3 style={{fontSize: "19px", fontWeight: 800, color: "var(--text-primary)"}}>
-                            {activeTab === "following" ? "팔로우한 사용자의 게시물이 없습니다" : "첫 게시물을 작성해보세요!"}
-                        </h3>
-                        <p style={{
-                            fontSize: "14px",
-                            color: "var(--text-secondary)",
-                            maxWidth: "380px",
-                            lineHeight: "1.6"
-                        }}>
-                            {activeTab === "following"
-                                ? "탐색 탭에서 흥미로운 개발자 및 크리에이터를 팔로우하거나 전체 피드로 전환해보세요."
-                                : "상단 작성기를 통해 아이디어나 최신 기술 스택 이야기를 커뮤니티에 공유해보세요."}
-                        </p>
-                        {activeTab === "following" && (
-                            <button
-                                onClick={() => setActiveTab("global")}
-                                className="btn-secondary"
-                                style={{marginTop: "8px"}}
+                            <div
+                                style={{
+                                    width: 64,
+                                    height: 64,
+                                    borderRadius: "50%",
+                                    backgroundColor: "var(--bg-surface)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "var(--accent-primary)",
+                                    boxShadow: "var(--shadow-glow)",
+                                }}
                             >
-                                <Globe size={15}/> 전체 피드 보기
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    posts.map((p) => <PostCard key={p.id} post={p} onPostDeleted={loadPosts}/>)
-                )}
-            </div>
+                                <Sparkles size={30}/>
+                            </div>
+                            <h3 style={{fontSize: "19px", fontWeight: 800, color: "var(--text-primary)"}}>
+                                {activeTab === "following" ? "팔로우한 사용자의 게시물이 없습니다" : "첫 게시물을 작성해보세요!"}
+                            </h3>
+                            <p style={{
+                                fontSize: "14px",
+                                color: "var(--text-secondary)",
+                                maxWidth: "380px",
+                                lineHeight: "1.6"
+                            }}>
+                                {activeTab === "following"
+                                    ? "탐색 탭에서 흥미로운 개발자 및 크리에이터를 팔로우하거나 전체 피드로 전환해보세요."
+                                    : "상단 작성기를 통해 아이디어나 최신 기술 스택 이야기를 커뮤니티에 공유해보세요."}
+                            </p>
+                            {activeTab === "following" && (
+                                <button
+                                    onClick={() => setActiveTab("global")}
+                                    className="btn-secondary"
+                                    style={{marginTop: "8px"}}
+                                >
+                                    <Globe size={15}/> 전체 피드 보기
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        posts.map((p) => <PostCard key={p.id} post={p} onPostDeleted={loadPosts}/>)
+                    )}
+                </div>
+            )}
+
+            {/* Floating Action Button (FAB) for post creation */}
+            {user && (
+                <button
+                    onClick={() => setShowPostModal(true)}
+                    className="fab-post-btn"
+                    aria-label="게시물 작성"
+                    title="새 게시물 작성"
+                >
+                    <Plus size={26} strokeWidth={2.5}/>
+                </button>
+            )}
+
+            {/* Post Composer Modal */}
+            {showPostModal && (
+                <PostComposerModal
+                    onClose={() => setShowPostModal(false)}
+                    onPostCreated={loadPosts}
+                />
+            )}
 
             <style jsx>{`
                 @keyframes spin {

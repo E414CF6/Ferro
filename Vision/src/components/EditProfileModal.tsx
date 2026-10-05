@@ -160,7 +160,7 @@ export default function EditProfileModal({
                             <input
                                 ref={headerFileRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,.heic,.heif,.avif"
                                 style={{ display: "none" }}
                                 onChange={(e) => {
                                     if (e.target.files?.[0]) handleFileSelect(e.target.files[0], "header");
@@ -208,13 +208,13 @@ export default function EditProfileModal({
                                 프로필 사진 변경
                             </div>
                             <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                                5MB 이하의 JPG, PNG, GIF, WEBP 지원
+                                50MB 이하의 JPG, PNG, GIF, WEBP, HEIF 지원
                             </div>
                         </div>
                         <input
                             ref={avatarFileRef}
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.heic,.heif,.avif"
                             style={{ display: "none" }}
                             onChange={(e) => {
                                 if (e.target.files?.[0]) handleFileSelect(e.target.files[0], "avatar");

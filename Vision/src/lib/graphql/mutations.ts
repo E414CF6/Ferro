@@ -145,14 +145,12 @@ export const MUTATIONS = {
       $content: String!
       $media: [MediaInput!]
       $poll: CreatePollInput
-      $quotePostId: ID
       $audience: PostAudienceGql
     ) {
       createPost(
         content: $content
         media: $media
         poll: $poll
-        quotePostId: $quotePostId
         audience: $audience
       ) {
         ${POST_FIELDS}

@@ -383,34 +383,63 @@ select {
 .mobile-bottom-nav {
     display: none;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 64px;
-    background-color: rgba(11, 15, 25, 0.94);
-    backdrop-filter: blur(16px);
-    border-top: 1px solid var(--border-subtle);
-    z-index: 50;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 360px;
+    height: 58px;
+    background-color: rgba(16, 23, 38, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+    z-index: 99;
     align-items: center;
     justify-content: space-around;
-    padding: 0 12px;
+    padding: 0 8px;
 }
 
 .mobile-nav-item {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     color: var(--text-secondary);
-    font-size: 11px;
-    font-weight: 600;
-    padding: 6px;
+    transition: all 0.2s var(--ease-spring);
     position: relative;
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    cursor: pointer;
 }
 
+.mobile-nav-item:hover,
 .mobile-nav-item.active {
     color: var(--accent-primary);
+    background-color: rgba(56, 189, 248, 0.12);
+}
+
+.mobile-nav-avatar-frame {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid var(--border-subtle);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s var(--ease-spring);
+    background-color: var(--bg-surface-elevated);
+}
+
+.mobile-nav-avatar-frame.active,
+.mobile-nav-item.active .mobile-nav-avatar-frame {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
 }
 
 /* ==========================================================================
@@ -1944,4 +1973,209 @@ select {
         padding: 30px 20px;
     }
 }
+
+/* ==========================================================================
+   Story Viewer Modal (Instagram-style Experience)
+   ========================================================================== */
+.story-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    user-select: none;
+    animation: fadeIn 0.2s ease;
+}
+
+.story-viewer-card {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    height: min(88vh, 760px);
+    background-color: #0b0f19;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.story-progress-bar-container {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    gap: 6px;
+    z-index: 25;
+}
+
+.story-progress-bar-bg {
+    flex: 1;
+    height: 3px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.story-progress-bar-fill {
+    height: 100%;
+    background-color: #ffffff;
+    border-radius: 999px;
+    transition: width 0.05s linear;
+}
+
+.story-viewer-header {
+    position: absolute;
+    top: 26px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 25;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+    padding-bottom: 20px;
+}
+
+.story-viewer-author {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.story-viewer-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.story-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1001;
+    transition: all 0.2s ease;
+}
+
+.story-nav-btn:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.story-nav-prev {
+    left: max(20px, calc(50% - 290px));
+}
+
+.story-nav-next {
+    right: max(20px, calc(50% - 290px));
+}
+
+.story-viewer-caption-box {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 25;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+    padding: 30px 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.story-viewer-caption {
+    font-size: 14px;
+    color: #fff;
+    line-height: 1.4;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    margin: 0;
+}
+
+.story-viewer-stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 768px) {
+    .story-nav-btn {
+        display: none;
+    }
+
+    .story-viewer-card {
+        max-width: 100%;
+        height: 100vh;
+        border-radius: 0;
+    }
+
+    .story-modal-overlay {
+        padding: 0;
+    }
+}
+
+/* ==========================================================================
+   Floating Action Button (FAB) for Post Creation
+   ========================================================================== */
+.fab-post-btn {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+    box-shadow: 0 8px 24px rgba(56, 189, 248, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    z-index: 95;
+    transition: all 0.25s var(--ease-spring);
+}
+
+.fab-post-btn:hover {
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 0 12px 30px rgba(56, 189, 248, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.fab-post-btn:active {
+    transform: scale(0.96);
+}
+
+@media (max-width: 768px) {
+    .fab-post-btn {
+        bottom: 84px;
+        right: 20px;
+        width: 52px;
+        height: 52px;
+    }
+}
+
 

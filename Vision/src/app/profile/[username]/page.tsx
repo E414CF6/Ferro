@@ -530,27 +530,13 @@ export default function ProfilePage() {
                 {/* Action Buttons */}
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                     {isMyProfile ? (
-                        <>
-                            <button
-                                onClick={() => setShow2faModal(true)}
-                                className="btn-secondary"
-                                style={{
-                                    fontWeight: 700,
-                                    color: profileUser.is2faEnabled ? "#10b981" : "inherit",
-                                }}
-                                title="2단계 인증(2FA) 보안 설정"
-                            >
-                                <ShieldCheck size={15} color={profileUser.is2faEnabled ? "#10b981" : "currentColor"} />
-                                2FA 보안
-                            </button>
-                            <button
-                                onClick={() => setShowEditModal(true)}
-                                className="btn-secondary"
-                                style={{ fontWeight: 700 }}
-                            >
-                                <Edit3 size={15} /> 프로필 수정
-                            </button>
-                        </>
+                        <button
+                            onClick={() => setShowEditModal(true)}
+                            className="btn-secondary"
+                            style={{ fontWeight: 700 }}
+                        >
+                            <Edit3 size={15} /> 프로필 수정
+                        </button>
                     ) : (
                         <>
                             {currentUser && (

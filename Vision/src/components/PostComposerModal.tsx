@@ -5,6 +5,7 @@ import {useAuth} from "@/lib/auth-context";
 import {fetchGraphQL, MUTATIONS} from "@/lib/graphql";
 import {useToast} from "@/lib/toast-context";
 import {formatErrorMessage} from "@/lib/i18n";
+import {uploadMedia} from "@/lib/upload";
 import {BarChart2, Globe, Image as ImageIcon, Lock, Plus, Send, Sparkles, Trash2, X,} from "lucide-react";
 
 interface PostComposerModalProps {
@@ -21,6 +22,7 @@ export default function PostComposerModal({
 
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
     const [attachedImages, setAttachedImages] = useState<string[]>([]);
     const [audience, setAudience] = useState<"PUBLIC" | "FOLLOWERS_ONLY">("PUBLIC");
 
@@ -32,33 +34,41 @@ export default function PostComposerModal({
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileSelect = (files: FileList) => {
-        const validFiles = Array.from(files).filter((file) => {
-            if (!file.type.startsWith("image/")) {
+    const handleFileSelect = async (files: FileList) => {
+        const fileList = Array.from(files);
+
+        if (attachedImages.length + fileList.length > 4) {
+            showToast("이미지는 최대 4장까지 첨부할 수 있습니다.", "error");
+            return;
+        }
+
+        const validFiles = fileList.filter((file) => {
+            const isImage =
+                file.type.startsWith("image/") ||
+                /\.(heic|heif|avif|jpe?g|png|gif|webp)$/i.test(file.name);
+            if (!isImage) {
                 showToast("이미지 파일만 첨부할 수 있습니다.", "error");
                 return false;
             }
-            if (file.size > 5 * 1024 * 1024) {
-                showToast("각 이미지는 최대 5MB까지 업로드 가능합니다.", "error");
+            if (file.size > 50 * 1024 * 1024) {
+                showToast("각 이미지는 최대 50MB까지 업로드 가능합니다.", "error");
                 return false;
             }
             return true;
         });
 
-        if (attachedImages.length + validFiles.length > 4) {
-            showToast("이미지는 최대 4장까지 첨부할 수 있습니다.", "error");
-            return;
-        }
+        if (validFiles.length === 0) return;
 
-        validFiles.forEach((file) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (e.target?.result) {
-                    setAttachedImages((prev) => [...prev, e.target!.result as string]);
-                }
-            };
-            reader.readAsDataURL(file);
-        });
+        setUploadingImage(true);
+        for (const file of validFiles) {
+            try {
+                const uploadedUrl = await uploadMedia(file);
+                setAttachedImages((prev) => [...prev, uploadedUrl]);
+            } catch (err: any) {
+                showToast(err.message || "이미지 업로드에 실패했습니다.", "error");
+            }
+        }
+        setUploadingImage(false);
     };
 
     const handleAddPollOption = () => {
@@ -479,7 +489,7 @@ export default function PostComposerModal({
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,.heic,.heif,.avif"
                                 multiple
                                 style={{display: "none"}}
                                 onChange={(e) => {
@@ -530,6 +540,7 @@ export default function PostComposerModal({
                                 type="submit"
                                 disabled={
                                     loading ||
+                                    uploadingImage ||
                                     (!content.trim() &&
                                         attachedImages.length === 0 &&
                                         !showPollCreator) ||
@@ -538,7 +549,7 @@ export default function PostComposerModal({
                                 className="btn-primary"
                             >
                                 <Send size={14}/>
-                                {loading ? "게시 중..." : "게시하기"}
+                                {loading ? "게시 중..." : uploadingImage ? "업로드 중..." : "게시하기"}
                             </button>
                         </div>
                     </div>

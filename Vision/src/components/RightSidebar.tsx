@@ -358,7 +358,7 @@ export default function RightSidebar() {
                             <span>인기 위키 (wMap)</span>
                         </div>
                         <Link
-                            href="/map"
+                            href="/?tab=map"
                             style={{fontSize: "11px", color: "var(--accent-primary)", fontWeight: 700}}
                         >
                             전체보기
@@ -369,7 +369,7 @@ export default function RightSidebar() {
                         {trendingArticles.map((art) => (
                             <Link
                                 key={art.id}
-                                href={`/map`}
+                                href="/?tab=map"
                                 style={{
                                     padding: "6px 8px",
                                     borderRadius: "var(--radius-sm)",
@@ -417,7 +417,7 @@ export default function RightSidebar() {
                 <div style={{display: "flex", gap: "10px", marginTop: "4px"}}>
                     <Link href="/explore" style={{color: "var(--text-secondary)"}}>탐색</Link>
                     <span>·</span>
-                    <Link href="/map" style={{color: "var(--text-secondary)"}}>위키맵</Link>
+                    <Link href="/?tab=map" style={{color: "var(--text-secondary)"}}>지도 피드</Link>
                 </div>
             </div>
         </aside>

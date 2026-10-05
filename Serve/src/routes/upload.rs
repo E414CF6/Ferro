@@ -12,7 +12,7 @@ use crate::infrastructure::auth::verify_jwt;
 use crate::infrastructure::config::AppConfig;
 use crate::infrastructure::storage::StorageService;
 
-const MAX_FILE_SIZE: usize = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE: usize = 50 * 1024 * 1024; // 50 MB
 
 /// Inspect raw file bytes to determine and validate authentic image format via Magic Bytes.
 /// Returns `Some((extension, canonical_mime_type))` if valid image format, or `None` if invalid.
@@ -39,6 +39,29 @@ pub fn validate_image_magic_bytes(data: &[u8]) -> Option<(&'static str, &'static
     // WEBP: RIFF....WEBP
     if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
         return Some(("webp", "image/webp"));
+    }
+
+    // HEIF / HEIC / AVIF: ISOBMFF container starting with 'ftyp' box type at offset 4
+    if data.len() >= 12 && &data[4..8] == b"ftyp" {
+        let inspect_len = data.len().min(64);
+        let header = &data[8..inspect_len];
+
+        // AVIF: AV1 Image File Format
+        if header.windows(4).any(|w| w == b"avif" || w == b"avis") {
+            return Some(("avif", "image/avif"));
+        }
+
+        // HEIC: High Efficiency Image Coding (HEVC-based)
+        if header.windows(4).any(|w| {
+            matches!(w, b"heic" | b"heix" | b"heim" | b"heis" | b"hevc" | b"hevx")
+        }) {
+            return Some(("heic", "image/heic"));
+        }
+
+        // Generic HEIF / MIAF
+        if header.windows(4).any(|w| matches!(w, b"mif1" | b"msf1" | b"miaf")) {
+            return Some(("heif", "image/heif"));
+        }
     }
 
     None
@@ -151,7 +174,7 @@ pub async fn upload_file_handler(
                         StatusCode::BAD_REQUEST,
                         Json(json!({
                             "error": "INVALID_FILE_SIGNATURE",
-                            "message": "Uploaded file content does not match allowed image signatures (JPEG, PNG, GIF, WEBP)"
+                            "message": "Uploaded file content does not match allowed image signatures (JPEG, PNG, GIF, WEBP, HEIC, HEIF, AVIF)"
                         })),
                     );
                 }
@@ -207,3 +230,66 @@ pub async fn upload_file_handler(
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_image_magic_bytes_jpeg() {
+        let jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
+        assert_eq!(validate_image_magic_bytes(&jpeg), Some(("jpg", "image/jpeg")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_png() {
+        let png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00];
+        assert_eq!(validate_image_magic_bytes(&png), Some(("png", "image/png")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_gif() {
+        let gif87 = b"GIF87a...";
+        let gif89 = b"GIF89a...";
+        assert_eq!(validate_image_magic_bytes(gif87), Some(("gif", "image/gif")));
+        assert_eq!(validate_image_magic_bytes(gif89), Some(("gif", "image/gif")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_webp() {
+        let webp = b"RIFF\x00\x00\x00\x00WEBPVP8 ...";
+        assert_eq!(validate_image_magic_bytes(webp), Some(("webp", "image/webp")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_heic() {
+        let mut heic = vec![0x00, 0x00, 0x00, 0x18];
+        heic.extend_from_slice(b"ftypheic");
+        heic.extend_from_slice(b"\x00\x00\x00\x00mif1heic");
+        assert_eq!(validate_image_magic_bytes(&heic), Some(("heic", "image/heic")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_heif() {
+        let mut heif = vec![0x00, 0x00, 0x00, 0x18];
+        heif.extend_from_slice(b"ftypmif1");
+        heif.extend_from_slice(b"\x00\x00\x00\x00mif1miaf");
+        assert_eq!(validate_image_magic_bytes(&heif), Some(("heif", "image/heif")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_avif() {
+        let mut avif = vec![0x00, 0x00, 0x00, 0x1c];
+        avif.extend_from_slice(b"ftypavif");
+        avif.extend_from_slice(b"\x00\x00\x00\x00mif1miafavif");
+        assert_eq!(validate_image_magic_bytes(&avif), Some(("avif", "image/avif")));
+    }
+
+    #[test]
+    fn test_validate_image_magic_bytes_invalid() {
+        assert_eq!(validate_image_magic_bytes(&[]), None);
+        assert_eq!(validate_image_magic_bytes(b"HELLO WORLD"), None);
+        assert_eq!(validate_image_magic_bytes(b"\x00\x00\x00\x18ftypmp42"), None);
+    }
+}
+

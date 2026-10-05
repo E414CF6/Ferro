@@ -4,6 +4,7 @@ import React, {useRef, useState} from "react";
 import {fetchGraphQL, MUTATIONS} from "@/lib/graphql";
 import {useToast} from "@/lib/toast-context";
 import {formatErrorMessage} from "@/lib/i18n";
+import {uploadMedia} from "@/lib/upload";
 import {Link as LinkIcon, Send, Upload, X} from "lucide-react";
 
 interface StoryCreateModalProps {
@@ -16,28 +17,35 @@ export default function StoryCreateModal({onClose}: StoryCreateModalProps) {
     const [mediaUrl, setMediaUrl] = useState("");
     const [caption, setCaption] = useState("");
     const [submitting, setSubmitting] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileSelect = (file: File) => {
-        if (!file.type.startsWith("image/")) {
+    const handleFileSelect = async (file: File) => {
+        const isImage =
+            file.type.startsWith("image/") ||
+            /\.(heic|heif|avif|jpe?g|png|gif|webp)$/i.test(file.name);
+        if (!isImage) {
             showToast("이미지 파일만 업로드할 수 있습니다.", "error");
             return;
         }
 
-        // Limit to 5MB
-        if (file.size > 5 * 1024 * 1024) {
-            showToast("이미지 파일 크기는 최대 5MB까지 가능합니다.", "error");
+        // Limit to 50MB
+        if (file.size > 50 * 1024 * 1024) {
+            showToast("이미지 파일 크기는 최대 50MB까지 가능합니다.", "error");
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            if (e.target?.result) {
-                setMediaUrl(e.target.result as string);
-            }
-        };
-        reader.readAsDataURL(file);
+        setUploading(true);
+        try {
+            const url = await uploadMedia(file);
+            setMediaUrl(url);
+            showToast("스토리 이미지가 업로드되었습니다.", "success");
+        } catch (err: any) {
+            showToast(err.message || "이미지 업로드에 실패했습니다.", "error");
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleDrop = (e: React.DragEvent) => {
@@ -169,7 +177,7 @@ export default function StoryCreateModal({onClose}: StoryCreateModalProps) {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,.heic,.heif,.avif"
                                 style={{display: "none"}}
                                 onChange={(e) => {
                                     if (e.target.files && e.target.files[0]) {
@@ -191,10 +199,10 @@ export default function StoryCreateModal({onClose}: StoryCreateModalProps) {
                                 <Upload size={22}/>
                             </div>
                             <div style={{fontWeight: 700, fontSize: "14px", color: "var(--text-primary)"}}>
-                                사진을 드래그하거나 클릭하여 업로드
+                                {uploading ? "사진 업로드 중..." : "사진을 드래그하거나 클릭하여 업로드"}
                             </div>
                             <div style={{fontSize: "12px", color: "var(--text-muted)", marginTop: "4px"}}>
-                                PNG, JPG, WEBP, GIF (최대 5MB)
+                                PNG, JPG, WEBP, GIF, HEIF (최대 50MB)
                             </div>
                         </div>
                     ) : (
@@ -290,9 +298,9 @@ export default function StoryCreateModal({onClose}: StoryCreateModalProps) {
                         <button type="button" onClick={onClose} className="btn-secondary">
                             취소
                         </button>
-                        <button type="submit" disabled={submitting || !mediaUrl.trim()} className="btn-primary">
+                        <button type="submit" disabled={submitting || uploading || !mediaUrl.trim()} className="btn-primary">
                             <Send size={14}/>
-                            {submitting ? "업로드 중..." : "스토리 공유하기"}
+                            {submitting ? "공유 중..." : uploading ? "업로드 중..." : "스토리 공유하기"}
                         </button>
                     </div>
                 </form>

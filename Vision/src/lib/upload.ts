@@ -14,7 +14,7 @@ export interface UploadResponse {
 
 /**
  * Uploads an image or media asset to Serve's /api/upload endpoint.
- * Validates file size (max 5MB) and authentic magic-byte file signature.
+ * Validates file size (max 50MB) and authentic magic-byte file signature.
  * Returns the fully qualified public URL for the uploaded asset.
  */
 export async function uploadMedia(file: File, token?: string | null): Promise<string> {
@@ -22,8 +22,8 @@ export async function uploadMedia(file: File, token?: string | null): Promise<st
         throw new Error("업로드할 파일이 지정되지 않았습니다.");
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-        throw new Error("파일 크기는 최대 5MB까지 업로드할 수 있습니다.");
+    if (file.size > 50 * 1024 * 1024) {
+        throw new Error("파일 크기는 최대 50MB까지 업로드할 수 있습니다.");
     }
 
     const authToken =
@@ -39,7 +39,10 @@ export async function uploadMedia(file: File, token?: string | null): Promise<st
     const formData = new FormData();
     formData.append("file", file);
 
-    const uploadUrl = `${API_BASE_URL}/api/upload`;
+    const uploadUrl =
+        typeof window !== "undefined"
+            ? "/api/upload"
+            : `${(process.env.BACKEND_URL || "http://127.0.0.1:8080").replace(/\/+$/, "")}/api/upload`;
     const res = await fetch(uploadUrl, {
         method: "POST",
         headers: {
