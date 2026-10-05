@@ -14,6 +14,7 @@ import {
     ListFilter,
     LogIn,
     LogOut,
+    MapPin,
     MessageCircle,
     PlusCircle,
     Sparkles,
@@ -22,7 +23,12 @@ import {
 import AuthModal from "./AuthModal";
 import StoryCreateModal from "./StoryCreateModal";
 import PostComposerModal from "./PostComposerModal";
-import {fetchGraphQL, QUERIES} from "@/lib/graphql";
+import {
+    fetchGraphQL,
+    QUERIES,
+    subscribeToDirectMessages,
+    subscribeToNotifications,
+} from "@/lib/graphql";
 
 export default function Sidebar() {
     const pathname = usePathname();
@@ -61,8 +67,22 @@ export default function Sidebar() {
         };
 
         checkBadges();
-        const interval = setInterval(checkBadges, 8000);
-        return () => clearInterval(interval);
+
+        // WebSocket live subscriptions
+        const unsubDm = subscribeToDirectMessages(user.id, () => {
+            setUnreadDmCount((prev) => prev + 1);
+        });
+
+        const unsubNotif = subscribeToNotifications(user.id, () => {
+            setUnreadNotifCount((prev) => prev + 1);
+        });
+
+        const interval = setInterval(checkBadges, 15000);
+        return () => {
+            clearInterval(interval);
+            unsubDm();
+            unsubNotif();
+        };
     }, [user, pathname]);
 
     const defaultAvatar =
@@ -98,6 +118,14 @@ export default function Sidebar() {
                         >
                             <Compass size={20}/>
                             <span>탐색 (Explore)</span>
+                        </Link>
+
+                        <Link
+                            href="/map"
+                            className={`nav-item ${pathname === "/map" ? "active" : ""}`}
+                        >
+                            <MapPin size={20} color="#ec4899"/>
+                            <span>위키 맵 (wMap)</span>
                         </Link>
 
                         {user && (
@@ -349,6 +377,13 @@ export default function Sidebar() {
                 >
                     <Compass size={22}/>
                     <span>탐색</span>
+                </Link>
+                <Link
+                    href="/map"
+                    className={`mobile-nav-item ${pathname === "/map" ? "active" : ""}`}
+                >
+                    <MapPin size={22} color="#ec4899"/>
+                    <span>위키맵</span>
                 </Link>
                 {user ? (
                     <>

@@ -74,7 +74,6 @@ export const MUTATIONS = {
       $headerImageUrl: String
       $location: String
       $website: String
-      $isPrivate: Boolean
     ) {
       updateUserProfile(
         displayName: $displayName
@@ -83,7 +82,6 @@ export const MUTATIONS = {
         headerImageUrl: $headerImageUrl
         location: $location
         website: $website
-        isPrivate: $isPrivate
       ) {
         id
         username
@@ -93,6 +91,16 @@ export const MUTATIONS = {
         headerImageUrl
         location
         website
+        isPrivate
+      }
+    }
+  `,
+
+    UPDATE_USER_PRIVACY: `
+    mutation UpdateUserPrivacy($isPrivate: Boolean!) {
+      updateUserPrivacy(isPrivate: $isPrivate) {
+        id
+        username
         isPrivate
       }
     }
@@ -184,6 +192,44 @@ export const MUTATIONS = {
     }
   `,
 
+    LIKE_POST: `
+    mutation LikePost($postId: ID!) {
+      likePost(postId: $postId) {
+        id
+        likesCount
+        isLikedBy
+      }
+    }
+  `,
+
+    UNLIKE_POST: `
+    mutation UnlikePost($postId: ID!) {
+      unlikePost(postId: $postId) {
+        id
+        likesCount
+        isLikedBy
+      }
+    }
+  `,
+
+    SAVE_POST: `
+    mutation SavePost($postId: ID!) {
+      savePost(postId: $postId) {
+        id
+        isSavedByMe
+      }
+    }
+  `,
+
+    UNSAVE_POST: `
+    mutation UnsavePost($postId: ID!) {
+      unsavePost(postId: $postId) {
+        id
+        isSavedByMe
+      }
+    }
+  `,
+
     VOTE_POLL: `
     mutation VotePoll($pollId: ID!, $optionId: ID!) {
       votePoll(pollId: $pollId, optionId: $optionId) {
@@ -202,18 +248,6 @@ export const MUTATIONS = {
     }
   `,
 
-    BOOKMARK_POST: `
-    mutation BookmarkPost($postId: ID!) {
-      bookmarkPost(postId: $postId)
-    }
-  `,
-
-    UNBOOKMARK_POST: `
-    mutation UnbookmarkPost($postId: ID!) {
-      unbookmarkPost(postId: $postId)
-    }
-  `,
-
     CREATE_BOOKMARK_COLLECTION: `
     mutation CreateBookmarkCollection($name: String!, $description: String, $isPrivate: Boolean) {
       createBookmarkCollection(name: $name, description: $description, isPrivate: $isPrivate) {
@@ -225,9 +259,32 @@ export const MUTATIONS = {
     }
   `,
 
+    UPDATE_BOOKMARK_COLLECTION: `
+    mutation UpdateBookmarkCollection($collectionId: ID!, $name: String, $description: String, $isPrivate: Boolean) {
+      updateBookmarkCollection(collectionId: $collectionId, name: $name, description: $description, isPrivate: $isPrivate) {
+        id
+        name
+        description
+        isPrivate
+      }
+    }
+  `,
+
+    DELETE_BOOKMARK_COLLECTION: `
+    mutation DeleteBookmarkCollection($collectionId: ID!) {
+      deleteBookmarkCollection(collectionId: $collectionId)
+    }
+  `,
+
     ADD_POST_TO_COLLECTION: `
     mutation AddPostToCollection($collectionId: ID!, $postId: ID!) {
       addPostToCollection(collectionId: $collectionId, postId: $postId)
+    }
+  `,
+
+    REMOVE_POST_FROM_COLLECTION: `
+    mutation RemovePostFromCollection($collectionId: ID!, $postId: ID!) {
+      removePostFromCollection(collectionId: $collectionId, postId: $postId)
     }
   `,
 
@@ -243,9 +300,32 @@ export const MUTATIONS = {
     }
   `,
 
+    UPDATE_USER_LIST: `
+    mutation UpdateUserList($listId: ID!, $name: String, $description: String, $isPrivate: Boolean) {
+      updateUserList(listId: $listId, name: $name, description: $description, isPrivate: $isPrivate) {
+        id
+        name
+        description
+        isPrivate
+      }
+    }
+  `,
+
+    DELETE_USER_LIST: `
+    mutation DeleteUserList($listId: ID!) {
+      deleteUserList(listId: $listId)
+    }
+  `,
+
     ADD_USER_TO_LIST: `
     mutation AddUserToList($listId: ID!, $userId: ID!) {
       addUserToList(listId: $listId, userId: $userId)
+    }
+  `,
+
+    REMOVE_USER_FROM_LIST: `
+    mutation RemoveUserFromList($listId: ID!, $userId: ID!) {
+      removeUserFromList(listId: $listId, userId: $userId)
     }
   `,
 
@@ -267,6 +347,22 @@ export const MUTATIONS = {
           avatarUrl
         }
       }
+    }
+  `,
+
+    EDIT_COMMENT: `
+    mutation EditComment($commentId: ID!, $content: String!) {
+      editComment(commentId: $commentId, content: $content) {
+        id
+        content
+        isEdited
+      }
+    }
+  `,
+
+    DELETE_COMMENT: `
+    mutation DeleteComment($commentId: ID!) {
+      deleteComment(commentId: $commentId)
     }
   `,
 
@@ -318,11 +414,30 @@ export const MUTATIONS = {
   `,
 
     REPORT_CONTENT: `
-    mutation ReportContent($targetType: ReportTargetTypeGql!, $targetId: ID!, $reason: ReportReasonGql!, $details: String) {
-      reportContent(targetType: $targetType, targetId: $targetId, reason: $reason, details: $details) {
+    mutation ReportContent(
+      $targetType: ReportTargetTypeGql!
+      $targetId: ID!
+      $reason: ReportReasonGql!
+      $details: String
+    ) {
+      reportContent(
+        targetType: $targetType
+        targetId: $targetId
+        reason: $reason
+        details: $details
+      ) {
         id
         status
         createdAt
+      }
+    }
+  `,
+
+    RESOLVE_REPORT: `
+    mutation ResolveReport($reportId: ID!, $status: ReportStatusGql!) {
+      resolveReport(reportId: $reportId, status: $status) {
+        id
+        status
       }
     }
   `,
@@ -351,15 +466,39 @@ export const MUTATIONS = {
     }
   `,
 
+    FOLLOW_USER: `
+    mutation FollowUser($followeeId: ID!) {
+      followUser(followeeId: $followeeId) {
+        id
+        followersCount
+        isFollowedByMe
+        hasPendingFollowRequest
+      }
+    }
+  `,
+
+    UNFOLLOW_USER: `
+    mutation UnfollowUser($followeeId: ID!) {
+      unfollowUser(followeeId: $followeeId) {
+        id
+        followersCount
+        isFollowedByMe
+      }
+    }
+  `,
+
     ACCEPT_FOLLOW_REQUEST: `
-    mutation AcceptFollowRequest($requestId: ID!) {
-      acceptFollowRequest(requestId: $requestId)
+    mutation AcceptFollowRequest($requesterId: ID!) {
+      acceptFollowRequest(requesterId: $requesterId) {
+        id
+        followersCount
+      }
     }
   `,
 
     REJECT_FOLLOW_REQUEST: `
-    mutation RejectFollowRequest($requestId: ID!) {
-      rejectFollowRequest(requestId: $requestId)
+    mutation RejectFollowRequest($requesterId: ID!) {
+      rejectFollowRequest(requesterId: $requesterId)
     }
   `,
 
@@ -384,53 +523,11 @@ export const MUTATIONS = {
     }
   `,
 
-    LIKE_POST: `
-    mutation LikePost($postId: ID!) {
-      likePost(postId: $postId) {
-        id
-        likesCount
-        isLikedBy
-        isLikedByMe
-      }
-    }
-  `,
-
-    UNLIKE_POST: `
-    mutation UnlikePost($postId: ID!) {
-      unlikePost(postId: $postId) {
-        id
-        likesCount
-        isLikedBy
-        isLikedByMe
-      }
-    }
-  `,
-
-    FOLLOW_USER: `
-    mutation FollowUser($followeeId: ID!) {
-      followUser(followeeId: $followeeId) {
-        id
-        followersCount
-        isFollowedByMe
-        hasPendingFollowRequest
-      }
-    }
-  `,
-
-    UNFOLLOW_USER: `
-    mutation UnfollowUser($followeeId: ID!) {
-      unfollowUser(followeeId: $followeeId) {
-        id
-        followersCount
-        isFollowedByMe
-      }
-    }
-  `,
-
     SEND_DIRECT_MESSAGE: `
     mutation SendDirectMessage($recipientId: ID!, $content: String!) {
       sendDirectMessage(recipientId: $recipientId, content: $content) {
         id
+        conversationId
         content
         createdAt
         isRead
@@ -451,15 +548,134 @@ export const MUTATIONS = {
     }
   `,
 
+    CREATE_GROUP_CONVERSATION: `
+    mutation CreateGroupConversation($title: String, $participantIds: [ID!]!) {
+      createGroupConversation(title: $title, participantIds: $participantIds) {
+        id
+        title
+        creatorId
+        createdAt
+        members {
+          id
+          username
+          displayName
+          avatarUrl
+        }
+      }
+    }
+  `,
+
+    SEND_GROUP_MESSAGE: `
+    mutation SendGroupMessage($conversationId: ID!, $content: String!) {
+      sendGroupMessage(conversationId: $conversationId, content: $content) {
+        id
+        conversationId
+        content
+        createdAt
+        isMine
+        sender {
+          id
+          username
+          displayName
+          avatarUrl
+        }
+      }
+    }
+  `,
+
+    SEND_TYPING_INDICATOR: `
+    mutation SendTypingIndicator($conversationId: ID, $recipientId: ID, $isTyping: Boolean!) {
+      sendTypingIndicator(conversationId: $conversationId, recipientId: $recipientId, isTyping: $isTyping)
+    }
+  `,
+
+    EDIT_DIRECT_MESSAGE: `
+    mutation EditDirectMessage($messageId: ID!, $content: String!) {
+      editDirectMessage(messageId: $messageId, content: $content) {
+        id
+        content
+        isRead
+      }
+    }
+  `,
+
+    DELETE_DIRECT_MESSAGE: `
+    mutation DeleteDirectMessage($messageId: ID!) {
+      deleteDirectMessage(messageId: $messageId)
+    }
+  `,
+
     MARK_MESSAGES_AS_READ: `
     mutation MarkMessagesAsRead($senderId: ID!) {
       markMessagesAsRead(senderId: $senderId)
     }
   `,
 
-    MARK_NOTIFICATIONS_AS_READ: `
-    mutation MarkNotificationsAsRead {
-      markNotificationsAsRead
+    MARK_NOTIFICATION_AS_READ: `
+    mutation MarkNotificationAsRead($notificationId: ID!) {
+      markNotificationAsRead(notificationId: $notificationId)
+    }
+  `,
+
+    MARK_ALL_NOTIFICATIONS_AS_READ: `
+    mutation MarkAllNotificationsAsRead {
+      markAllNotificationsAsRead
+    }
+  `,
+
+    /* ========================================================================= */
+    /* Wiki Map (wMap) Mutations                                                 */
+    /* ========================================================================= */
+
+    CREATE_WIKI_ARTICLE: `
+    mutation CreateWikiArticle($input: CreateArticleInput!) {
+      createArticle(input: $input) {
+        id
+        title
+        slug
+        summary
+        content
+        latitude
+        longitude
+        zoom
+        category
+        tags
+        author
+        views
+        createdAt
+      }
+    }
+  `,
+
+    UPDATE_WIKI_ARTICLE: `
+    mutation UpdateWikiArticle($slug: String!, $input: UpdateArticleInput!) {
+      updateArticle(slug: $slug, input: $input) {
+        id
+        title
+        slug
+        summary
+        content
+        latitude
+        longitude
+        zoom
+        category
+        tags
+        author
+        views
+        updatedAt
+      }
+    }
+  `,
+
+    DELETE_WIKI_ARTICLE: `
+    mutation DeleteWikiArticle($slug: String!) {
+      deleteArticle(slug: $slug)
+    }
+  `,
+
+    RECORD_ARTICLE_VIEW: `
+    mutation RecordArticleView($articleId: ID!) {
+      recordArticleView(articleId: $articleId)
     }
   `,
 };

@@ -3,11 +3,22 @@
 import React, {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import {Post, User} from "@/lib/types";
+import {HashtagTrend, TrendingArticleItem, User} from "@/lib/types";
 import {useAuth} from "@/lib/auth-context";
 import {fetchGraphQL, MUTATIONS, QUERIES} from "@/lib/graphql";
 import {useToast} from "@/lib/toast-context";
-import {ArrowRight, Hash, RefreshCw, Search, TrendingUp, UserPlus, Users, X,} from "lucide-react";
+import {
+    ArrowRight,
+    Globe,
+    Hash,
+    MapPin,
+    RefreshCw,
+    Search,
+    TrendingUp,
+    UserPlus,
+    Users,
+    X,
+} from "lucide-react";
 
 export default function RightSidebar() {
     const router = useRouter();
@@ -16,6 +27,7 @@ export default function RightSidebar() {
     const [searchQuery, setSearchQuery] = useState("");
     const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
     const [trendingTags, setTrendingTags] = useState<{ tag: string; count: number }[]>([]);
+    const [trendingArticles, setTrendingArticles] = useState<TrendingArticleItem[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
     const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
 
@@ -36,45 +48,51 @@ export default function RightSidebar() {
 
     const loadTrendingTopics = useCallback(async () => {
         try {
-            const data = await fetchGraphQL<{ posts: Post[] }>(QUERIES.GLOBAL_POSTS, {limit: 50});
-            if (data?.posts) {
-                const tagCountMap = new Map<string, number>();
-                data.posts.forEach((p) => {
-                    const matches = p.content.match(/#([\w가-힣]+)/g);
-                    if (matches) {
-                        matches.forEach((m) => {
-                            const tag = m.substring(1);
-                            tagCountMap.set(tag, (tagCountMap.get(tag) || 0) + 1);
-                        });
-                    }
-                });
+            const data = await fetchGraphQL<{ trendingHashtags: HashtagTrend[] }>(
+                QUERIES.TRENDING_HASHTAGS,
+                {limit: 6}
+            ).catch(() => null);
 
-                const sortedTags = Array.from(tagCountMap.entries())
-                    .map(([tag, count]) => ({tag, count}))
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 5);
-
-                if (sortedTags.length > 0) {
-                    setTrendingTags(sortedTags);
-                } else {
-                    setTrendingTags([
-                        {tag: "Rust", count: 18},
-                        {tag: "Axum", count: 12},
-                        {tag: "GraphQL", count: 9},
-                        {tag: "NextJS", count: 8},
-                        {tag: "DevLife", count: 5},
-                    ]);
-                }
+            if (data?.trendingHashtags && data.trendingHashtags.length > 0) {
+                setTrendingTags(
+                    data.trendingHashtags.map((h) => ({
+                        tag: h.hashtag,
+                        count: h.postsCount,
+                    }))
+                );
+            } else {
+                setTrendingTags([
+                    {tag: "Rust", count: 18},
+                    {tag: "Axum", count: 12},
+                    {tag: "GraphQL", count: 9},
+                    {tag: "NextJS", count: 8},
+                    {tag: "DevLife", count: 5},
+                ]);
             }
         } catch (err) {
             console.error("Failed to load trending topics:", err);
         }
     }, []);
 
+    const loadWikiTrends = useCallback(async () => {
+        try {
+            const data = await fetchGraphQL<{
+                wikiTrends: { articles: TrendingArticleItem[] };
+            }>(QUERIES.WIKI_TRENDS, {forceRefresh: false}).catch(() => null);
+
+            if (data?.wikiTrends?.articles) {
+                setTrendingArticles(data.wikiTrends.articles.slice(0, 4));
+            }
+        } catch (err) {
+            console.error("Failed to load wiki trends:", err);
+        }
+    }, []);
+
     useEffect(() => {
         loadSuggestedUsers();
         loadTrendingTopics();
-    }, [loadSuggestedUsers, loadTrendingTopics]);
+        loadWikiTrends();
+    }, [loadSuggestedUsers, loadTrendingTopics, loadWikiTrends]);
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,10 +118,10 @@ export default function RightSidebar() {
 
         try {
             if (isFollowing) {
-                await fetchGraphQL(MUTATIONS.UNFOLLOW_USER, {userId});
+                await fetchGraphQL(MUTATIONS.UNFOLLOW_USER, {followeeId: userId});
                 showToast(`@${targetUser.username} 님을 언팔로우했습니다.`, "info");
             } else {
-                await fetchGraphQL(MUTATIONS.FOLLOW_USER, {userId});
+                await fetchGraphQL(MUTATIONS.FOLLOW_USER, {followeeId: userId});
                 showToast(`@${targetUser.username} 님을 팔로우했습니다.`, "success");
             }
         } catch (err: any) {
@@ -148,14 +166,6 @@ export default function RightSidebar() {
                             outline: "none",
                             transition: "all var(--transition-fast)",
                         }}
-                        onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "var(--border-focus)";
-                            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(56, 189, 248, 0.15)";
-                        }}
-                        onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "var(--border-subtle)";
-                            e.currentTarget.style.boxShadow = "none";
-                        }}
                     />
                     {searchQuery && (
                         <button
@@ -195,8 +205,6 @@ export default function RightSidebar() {
                         onClick={loadSuggestedUsers}
                         title="새로고침"
                         style={{color: "var(--text-muted)", padding: "4px"}}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
                     >
                         <RefreshCw
                             size={13}
@@ -237,18 +245,18 @@ export default function RightSidebar() {
                                         style={{width: 38, height: 38, borderRadius: "50%", objectFit: "cover"}}
                                     />
                                     <div className="user-compact-names">
-                    <span
-                        style={{
-                            fontSize: "13px",
-                            fontWeight: 700,
-                            color: "var(--text-primary)",
-                        }}
-                    >
-                      {u.displayName || u.username}
-                    </span>
+                                        <span
+                                            style={{
+                                                fontSize: "13px",
+                                                fontWeight: 700,
+                                                color: "var(--text-primary)",
+                                            }}
+                                        >
+                                            {u.displayName || u.username}
+                                        </span>
                                         <span style={{fontSize: "11px", color: "var(--text-muted)"}}>
-                      @{u.username}
-                    </span>
+                                            @{u.username}
+                                        </span>
                                     </div>
                                 </Link>
 
@@ -260,7 +268,6 @@ export default function RightSidebar() {
                                         borderRadius: "var(--radius-full)",
                                         fontSize: "12px",
                                         fontWeight: 700,
-                                        transition: "all var(--transition-fast)",
                                         backgroundColor: u.isFollowedByMe
                                             ? "var(--bg-surface-hover)"
                                             : "var(--accent-primary)",
@@ -272,8 +279,8 @@ export default function RightSidebar() {
                                         "팔로잉"
                                     ) : (
                                         <span style={{display: "inline-flex", alignItems: "center", gap: 3}}>
-                      <UserPlus size={11}/> 팔로우
-                    </span>
+                                            <UserPlus size={11}/> 팔로우
+                                        </span>
                                     )}
                                 </button>
                             </div>
@@ -282,14 +289,14 @@ export default function RightSidebar() {
                 </div>
             </div>
 
-            {/* Trending Topics Widget */}
+            {/* Trending Hashtags Widget */}
             <div className="sidebar-widget">
                 <div className="widget-title">
                     <TrendingUp size={16} color="#ec4899"/>
                     <span>실시간 인기 태그</span>
                 </div>
 
-                <div style={{display: "flex", flexDirection: "column", gap: "10px"}}>
+                <div style={{display: "flex", flexDirection: "column", gap: "8px"}}>
                     {trendingTags.map((item) => (
                         <Link
                             key={item.tag}
@@ -335,34 +342,72 @@ export default function RightSidebar() {
                 </div>
             </div>
 
-            {/* Guest Welcome Box if not logged in */}
-            {!user && (
-                <div
-                    style={{
-                        padding: "18px",
-                        borderRadius: "var(--radius-lg)",
-                        background: "linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%)",
-                        border: "1px solid rgba(56, 189, 248, 0.3)",
-                    }}
-                >
-                    <div style={{fontSize: "14px", fontWeight: 800, color: "var(--text-primary)", marginBottom: "6px"}}>
-                        ✨ Ferro에 오신 것을 환영합니다!
-                    </div>
-                    <p style={{
-                        fontSize: "12px",
-                        color: "var(--text-secondary)",
-                        lineHeight: "1.5",
-                        marginBottom: "12px"
-                    }}>
-                        24시간 스토리, 1:1 다이렉트 메시지, 초고속 Rust 피드를 경험해보세요.
-                    </p>
-                    <Link
-                        href="/welcome"
-                        className="btn-primary"
-                        style={{width: "100%", justifyContent: "center", fontSize: "12px", padding: "8px"}}
+            {/* Trending Wiki Articles Widget (wMap) */}
+            {trendingArticles.length > 0 && (
+                <div className="sidebar-widget">
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: "12px",
+                        }}
                     >
-                        소개 & 가입 페이지로 이동 <ArrowRight size={13}/>
-                    </Link>
+                        <div className="widget-title" style={{margin: 0}}>
+                            <MapPin size={16} color="var(--accent-primary)"/>
+                            <span>인기 위키 (wMap)</span>
+                        </div>
+                        <Link
+                            href="/map"
+                            style={{fontSize: "11px", color: "var(--accent-primary)", fontWeight: 700}}
+                        >
+                            전체보기
+                        </Link>
+                    </div>
+
+                    <div style={{display: "flex", flexDirection: "column", gap: "6px"}}>
+                        {trendingArticles.map((art) => (
+                            <Link
+                                key={art.id}
+                                href={`/map`}
+                                style={{
+                                    padding: "6px 8px",
+                                    borderRadius: "var(--radius-sm)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    transition: "background-color var(--transition-fast)",
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-surface-hover)")}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                            >
+                                <div style={{display: "flex", alignItems: "center", gap: "8px", minWidth: 0}}>
+                                    <span style={{fontSize: "12px", fontWeight: 900, color: "var(--accent-primary)"}}>
+                                        #{art.rank}
+                                    </span>
+                                    <div style={{minWidth: 0}}>
+                                        <div
+                                            style={{
+                                                fontSize: "12px",
+                                                fontWeight: 700,
+                                                color: "var(--text-primary)",
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                maxWidth: "180px",
+                                            }}
+                                        >
+                                            {art.title}
+                                        </div>
+                                        <div style={{fontSize: "10px", color: "var(--text-muted)"}}>
+                                            {art.category} · 조회 {art.views}
+                                        </div>
+                                    </div>
+                                </div>
+                                <ArrowRight size={12} color="var(--text-muted)"/>
+                            </Link>
+                        ))}
+                    </div>
                 </div>
             )}
 
@@ -374,8 +419,7 @@ export default function RightSidebar() {
                     <span>·</span>
                     <Link href="/explore" style={{color: "var(--text-secondary)"}}>탐색</Link>
                     <span>·</span>
-                    <a href="https://github.com" target="_blank" rel="noreferrer"
-                       style={{color: "var(--text-secondary)"}}>GitHub</a>
+                    <Link href="/map" style={{color: "var(--text-secondary)"}}>위키맵</Link>
                 </div>
             </div>
         </aside>

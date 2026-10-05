@@ -2,8 +2,8 @@ import {POST_FIELDS} from "./fragments";
 
 export const QUERIES = {
     ME: `
-    query GetMe {
-      me {
+    query GetMe($userId: ID) {
+      me(userId: $userId) {
         id
         username
         email
@@ -25,8 +25,8 @@ export const QUERIES = {
   `,
 
     STORIES_FEED: `
-    query GetStoriesFeed {
-      storiesFeed {
+    query GetStoriesFeed($userId: ID) {
+      storiesFeed(userId: $userId) {
         id
         mediaUrl
         caption
@@ -46,8 +46,8 @@ export const QUERIES = {
   `,
 
     ACTIVE_STORIES: `
-    query GetActiveStories($userId: ID) {
-      activeStories(userId: $userId) {
+    query GetActiveStories($userId: ID!) {
+      storiesForUser(userId: $userId) {
         id
         mediaUrl
         caption
@@ -82,8 +82,8 @@ export const QUERIES = {
   `,
 
     FEED: `
-    query GetFeed($limit: Int, $offset: Int) {
-      feed(limit: $limit, offset: $offset) {
+    query GetFeed($userId: ID, $limit: Int, $offset: Int) {
+      feed(userId: $userId, limit: $limit, offset: $offset) {
         ${POST_FIELDS}
       }
     }
@@ -97,19 +97,56 @@ export const QUERIES = {
     }
   `,
 
-    SEARCH_POSTS: `
-    query SearchPosts($query: String!) {
-      searchPosts(query: $query) {
+    POST: `
+    query GetPost($id: ID!) {
+      post(id: $id) {
         ${POST_FIELDS}
       }
     }
   `,
 
-    SEARCH_HASHTAGS: `
-    query SearchHashtags($query: String!) {
-      searchHashtags(query: $query) {
-        id
-        name
+    SEARCH_POSTS: `
+    query SearchPostsConnection($query: String!, $first: Int, $after: String) {
+      searchPostsConnection(query: $query, first: $first, after: $after) {
+        edges {
+          cursor
+          node {
+            ${POST_FIELDS}
+          }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
+        }
+      }
+    }
+  `,
+
+    POSTS_BY_HASHTAG: `
+    query GetPostsByHashtag($hashtag: String!, $first: Int, $after: String) {
+      postsByHashtag(hashtag: $hashtag, first: $first, after: $after) {
+        edges {
+          cursor
+          node {
+            ${POST_FIELDS}
+          }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
+        }
+      }
+    }
+  `,
+
+    TRENDING_HASHTAGS: `
+    query GetTrendingHashtags($limit: Int) {
+      trendingHashtags(limit: $limit) {
+        hashtag
         postsCount
       }
     }
@@ -118,6 +155,7 @@ export const QUERIES = {
     POST_ANALYTICS: `
     query GetPostAnalytics($postId: ID!) {
       postAnalytics(postId: $postId) {
+        postId
         viewsCount
         likesCount
         repostsCount
@@ -128,8 +166,8 @@ export const QUERIES = {
   `,
 
     NOTIFICATIONS: `
-    query GetNotifications($limit: Int, $offset: Int) {
-      notifications(limit: $limit, offset: $offset) {
+    query GetNotifications($userId: ID, $limit: Int, $offset: Int) {
+      notifications(userId: $userId, limit: $limit, offset: $offset) {
         id
         notificationType
         isRead
@@ -140,11 +178,17 @@ export const QUERIES = {
           displayName
           avatarUrl
         }
-        post {
+        sender {
+          id
+          username
+          displayName
+          avatarUrl
+        }
+        targetPost {
           id
           content
         }
-        comment {
+        targetComment {
           id
           content
         }
@@ -153,34 +197,67 @@ export const QUERIES = {
   `,
 
     UNREAD_NOTIFICATIONS_COUNT: `
-    query GetUnreadNotificationsCount {
-      unreadNotificationsCount
+    query GetUnreadNotificationsCount($userId: ID) {
+      unreadNotificationsCount(userId: $userId)
     }
   `,
 
     BOOKMARK_COLLECTIONS: `
-    query GetBookmarkCollections {
-      bookmarkCollections {
+    query GetBookmarkCollections($userId: ID) {
+      bookmarkCollections(userId: $userId) {
         id
         name
         description
         isPrivate
-        postsCount
       }
     }
   `,
 
-    COLLECTION_POSTS: `
-    query GetCollectionPosts($collectionId: ID!, $limit: Int, $offset: Int) {
-      collectionPosts(collectionId: $collectionId, limit: $limit, offset: $offset) {
-        ${POST_FIELDS}
+    BOOKMARK_COLLECTION: `
+    query GetBookmarkCollection($id: ID!, $first: Int, $after: String) {
+      bookmarkCollection(id: $id) {
+        id
+        name
+        description
+        isPrivate
+        postsConnection(first: $first, after: $after) {
+          edges {
+            cursor
+            node {
+              ${POST_FIELDS}
+            }
+          }
+          pageInfo {
+            hasNextPage
+            startCursor
+            endCursor
+          }
+        }
+      }
+    }
+  `,
+
+    SAVED_POSTS: `
+    query GetSavedPostsConnection($userId: ID, $first: Int, $after: String) {
+      savedPostsConnection(userId: $userId, first: $first, after: $after) {
+        edges {
+          cursor
+          node {
+            ${POST_FIELDS}
+          }
+        }
+        pageInfo {
+          hasNextPage
+          startCursor
+          endCursor
+        }
       }
     }
   `,
 
     USER_LISTS: `
-    query GetUserLists {
-      userLists {
+    query GetUserLists($userId: ID) {
+      userLists(userId: $userId) {
         id
         name
         description
@@ -197,9 +274,20 @@ export const QUERIES = {
   `,
 
     LIST_FEED: `
-    query GetListFeed($listId: ID!, $limit: Int, $offset: Int) {
-      listFeed(listId: $listId, limit: $limit, offset: $offset) {
-        ${POST_FIELDS}
+    query GetListFeedConnection($listId: ID!, $first: Int, $after: String) {
+      listFeedConnection(listId: $listId, first: $first, after: $after) {
+        edges {
+          cursor
+          node {
+            ${POST_FIELDS}
+          }
+        }
+        pageInfo {
+          hasNextPage
+          hasPreviousPage
+          startCursor
+          endCursor
+        }
       }
     }
   `,
@@ -221,6 +309,23 @@ export const QUERIES = {
         isMutedByMe
         hasPendingFollowRequest
         isMe
+      }
+    }
+  `,
+
+    SEARCH_USERS: `
+    query SearchUsers($query: String!, $limit: Int) {
+      searchUsers(query: $query, limit: $limit) {
+        id
+        username
+        displayName
+        bio
+        avatarUrl
+        isPrivate
+        hasActiveStories
+        followersCount
+        followingCount
+        isFollowedByMe
       }
     }
   `,
@@ -254,6 +359,25 @@ export const QUERIES = {
         }
         likedPosts {
           ${POST_FIELDS}
+        }
+        savedPosts {
+          ${POST_FIELDS}
+        }
+        followers {
+          id
+          username
+          displayName
+          avatarUrl
+          bio
+          isFollowedByMe
+        }
+        following {
+          id
+          username
+          displayName
+          avatarUrl
+          bio
+          isFollowedByMe
         }
         activeStories {
           id
@@ -301,6 +425,7 @@ export const QUERIES = {
     query GetDirectMessages($otherUserId: ID!, $limit: Int, $offset: Int) {
       directMessages(otherUserId: $otherUserId, limit: $limit, offset: $offset) {
         id
+        conversationId
         content
         createdAt
         isRead
@@ -321,9 +446,210 @@ export const QUERIES = {
     }
   `,
 
+    GROUP_CONVERSATIONS: `
+    query GetGroupConversations {
+      groupConversations {
+        id
+        title
+        creatorId
+        createdAt
+        members {
+          id
+          username
+          displayName
+          avatarUrl
+        }
+        messages(limit: 1) {
+          id
+          content
+          createdAt
+          sender {
+            id
+            username
+            displayName
+          }
+        }
+      }
+    }
+  `,
+
+    GROUP_CONVERSATION: `
+    query GetGroupConversation($id: ID!) {
+      groupConversation(id: $id) {
+        id
+        title
+        creatorId
+        createdAt
+        members {
+          id
+          username
+          displayName
+          avatarUrl
+        }
+        messages(limit: 60) {
+          id
+          content
+          createdAt
+          isMine
+          sender {
+            id
+            username
+            displayName
+            avatarUrl
+          }
+        }
+      }
+    }
+  `,
+
     UNREAD_DM_COUNT: `
     query GetUnreadDmCount {
       unreadDmCount
+    }
+  `,
+
+    PENDING_FOLLOW_REQUESTS: `
+    query GetPendingFollowRequests {
+      pendingFollowRequests {
+        id
+        requesterId
+        targetId
+        status
+        createdAt
+        requester {
+          id
+          username
+          displayName
+          avatarUrl
+          bio
+        }
+      }
+    }
+  `,
+
+    PENDING_FOLLOW_REQUESTS_COUNT: `
+    query GetPendingFollowRequestsCount {
+      pendingFollowRequestsCount
+    }
+  `,
+
+    REPORTS: `
+    query GetReports($status: ReportStatusGql, $limit: Int) {
+      reports(status: $status, limit: $limit) {
+        id
+        reporterId
+        targetType
+        targetId
+        reason
+        details
+        status
+        createdAt
+        reporter {
+          id
+          username
+          displayName
+          avatarUrl
+        }
+      }
+    }
+  `,
+
+    /* ========================================================================= */
+    /* Wiki Map (wMap) Queries                                                   */
+    /* ========================================================================= */
+
+    WIKI_ARTICLES: `
+    query GetWikiArticles($filter: ArticleFilterInput) {
+      articles(filter: $filter) {
+        id
+        userId
+        title
+        slug
+        summary
+        content
+        latitude
+        longitude
+        zoom
+        category
+        tags
+        geojson
+        author
+        views
+        createdAt
+        updatedAt
+      }
+    }
+  `,
+
+    WIKI_ARTICLE: `
+    query GetWikiArticle($slug: String!) {
+      article(slug: $slug) {
+        id
+        userId
+        title
+        slug
+        summary
+        content
+        latitude
+        longitude
+        zoom
+        category
+        tags
+        geojson
+        author
+        views
+        createdAt
+        updatedAt
+        revisions(limit: 25) {
+          id
+          articleId
+          userId
+          title
+          content
+          latitude
+          longitude
+          editSummary
+          author
+          createdAt
+        }
+      }
+    }
+  `,
+
+    WIKI_TRENDS: `
+    query GetWikiTrends($forceRefresh: Boolean) {
+      wikiTrends(forceRefresh: $forceRefresh) {
+        totalArticles
+        updatedAt
+        articles {
+          rank
+          prevRank
+          change
+          changeAmount
+          id
+          title
+          slug
+          summary
+          latitude
+          longitude
+          zoom
+          category
+          tags
+          views
+          recentViews
+          score
+          updatedAt
+        }
+        tags {
+          rank
+          prevRank
+          change
+          changeAmount
+          tag
+          count
+          score
+        }
+      }
     }
   `,
 };

@@ -12,11 +12,15 @@ export type ErrorCode =
     | "AUTH_INVALID_USERNAME"
     | "AUTH_INVALID_EMAIL"
     | "AUTH_PASSWORD_TOO_SHORT"
+    | "TOTP_INVALID_CODE"
+    | "TOTP_ALREADY_ENABLED"
     | "USER_NOT_FOUND"
     | "USER_CANNOT_FOLLOW_SELF"
     | "USER_PROFILE_UPDATE_FAILED"
     | "USER_FOLLOW_FAILED"
     | "USER_UNFOLLOW_FAILED"
+    | "USER_BLOCKED"
+    | "CANNOT_BLOCK_SELF"
     | "STORY_NOT_FOUND"
     | "STORY_AUTHOR_NOT_FOUND"
     | "STORY_VIEWERS_AUTH_REQUIRED"
@@ -30,7 +34,10 @@ export type ErrorCode =
     | "POST_DELETE_FAILED"
     | "POST_LIKE_FAILED"
     | "POST_UNLIKE_FAILED"
+    | "POST_ALREADY_REPOSTED"
     | "POST_CONTENT_INVALID"
+    | "POLL_ALREADY_VOTED"
+    | "POLL_EXPIRED"
     | "COMMENT_NOT_FOUND"
     | "COMMENT_AUTHOR_NOT_FOUND"
     | "COMMENT_CREATE_FAILED"
@@ -43,6 +50,17 @@ export type ErrorCode =
     | "DM_SENDER_NOT_FOUND"
     | "DM_RECIPIENT_NOT_FOUND"
     | "DM_CONTENT_INVALID"
+    | "CONVERSATION_NOT_FOUND"
+    | "WIKI_ARTICLE_NOT_FOUND"
+    | "WIKI_ARTICLE_TITLE_INVALID"
+    | "WIKI_ARTICLE_CONTENT_INVALID"
+    | "WIKI_ARTICLE_COORDINATES_INVALID"
+    | "WIKI_ARTICLE_TAGS_INVALID"
+    | "WIKI_ARTICLE_CREATE_FAILED"
+    | "WIKI_ARTICLE_UPDATE_FAILED"
+    | "WIKI_ARTICLE_DELETE_FAILED"
+    | "RATE_LIMIT_EXCEEDED"
+    | "INVALID_CURSOR"
     | "ERROR_NOT_FOUND"
     | "ERROR_BAD_REQUEST"
     | "ERROR_UNAUTHENTICATED"
@@ -51,10 +69,10 @@ export type ErrorCode =
     | "ERROR_INTERNAL";
 
 export class AppGraphQLError extends Error {
-    code: ErrorCode;
+    code: string;
     params: Record<string, string>;
 
-    constructor(message: string, code: ErrorCode = "ERROR_INTERNAL", params: Record<string, string> = {}) {
+    constructor(message: string, code: string = "ERROR_INTERNAL", params: Record<string, string> = {}) {
         super(message);
         this.name = "AppGraphQLError";
         this.code = code;
@@ -75,12 +93,16 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         AUTH_INVALID_USERNAME: "사용자 아이디는 3~50자의 영문, 숫자, 밑줄(_)만 사용할 수 있습니다.",
         AUTH_INVALID_EMAIL: "유효한 이메일 주소 형식을 입력해주세요.",
         AUTH_PASSWORD_TOO_SHORT: "비밀번호는 최소 8자 이상이어야 합니다.",
+        TOTP_INVALID_CODE: "2단계 인증 코드가 올바르지 않습니다.",
+        TOTP_ALREADY_ENABLED: "2단계 인증이 이미 활성화되어 있습니다.",
 
         USER_NOT_FOUND: "사용자를 찾을 수 없습니다.",
         USER_CANNOT_FOLLOW_SELF: "자기 자신을 팔로우할 수 없습니다.",
         USER_PROFILE_UPDATE_FAILED: "프로필 수정에 실패했습니다: {detail}",
         USER_FOLLOW_FAILED: "팔로우 처리에 실패했습니다: {detail}",
         USER_UNFOLLOW_FAILED: "언팔로우 처리에 실패했습니다: {detail}",
+        USER_BLOCKED: "차단된 사용자와는 상호작용할 수 없습니다.",
+        CANNOT_BLOCK_SELF: "자기 자신을 차단할 수 없습니다.",
 
         STORY_NOT_FOUND: "해당 스토리를 찾을 수 없습니다.",
         STORY_AUTHOR_NOT_FOUND: "스토리 작성자를 찾을 수 없습니다.",
@@ -96,7 +118,11 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         POST_DELETE_FAILED: "게시물 삭제에 실패했습니다: {detail}",
         POST_LIKE_FAILED: "좋아요 처리에 실패했습니다: {detail}",
         POST_UNLIKE_FAILED: "좋아요 취소에 실패했습니다: {detail}",
-        POST_CONTENT_INVALID: "게시물 내용을 입력해주세요. (최대 2,000자)",
+        POST_ALREADY_REPOSTED: "이미 리포스트한 게시물입니다.",
+        POST_CONTENT_INVALID: "게시물 내용을 입력해주세요. (최대 5,000자)",
+
+        POLL_ALREADY_VOTED: "이미 투표에 참여하셨습니다.",
+        POLL_EXPIRED: "투표 기간이 만료되었습니다.",
 
         COMMENT_NOT_FOUND: "댓글을 찾을 수 없습니다.",
         COMMENT_AUTHOR_NOT_FOUND: "댓글 작성자를 찾을 수 없습니다.",
@@ -111,6 +137,19 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         DM_SENDER_NOT_FOUND: "메시지 발신자를 찾을 수 없습니다.",
         DM_RECIPIENT_NOT_FOUND: "메시지 수신자를 찾을 수 없습니다.",
         DM_CONTENT_INVALID: "메시지 내용을 입력해주세요. (최대 2,000자)",
+        CONVERSATION_NOT_FOUND: "대화방을 찾을 수 없습니다.",
+
+        WIKI_ARTICLE_NOT_FOUND: "해당 위키 문서를 찾을 수 없습니다.",
+        WIKI_ARTICLE_TITLE_INVALID: "위키 문서 제목을 입력해주세요 (최대 100자).",
+        WIKI_ARTICLE_CONTENT_INVALID: "위키 문서 내용을 입력해주세요.",
+        WIKI_ARTICLE_COORDINATES_INVALID: "지리적 좌표가 유효한 범위를 벗어났습니다.",
+        WIKI_ARTICLE_TAGS_INVALID: "태그는 최대 15개까지 등록할 수 있습니다.",
+        WIKI_ARTICLE_CREATE_FAILED: "위키 문서 등록에 실패했습니다: {detail}",
+        WIKI_ARTICLE_UPDATE_FAILED: "위키 문서 수정에 실패했습니다: {detail}",
+        WIKI_ARTICLE_DELETE_FAILED: "위키 문서 삭제에 실패했습니다: {detail}",
+
+        RATE_LIMIT_EXCEEDED: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+        INVALID_CURSOR: "유효하지 않거나 만료된 페이지 커서입니다.",
 
         ERROR_NOT_FOUND: "요청하신 리소스를 찾을 수 없습니다.",
         ERROR_BAD_REQUEST: "잘못된 요청입니다: {detail}",
@@ -118,7 +157,8 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         ERROR_FORBIDDEN: "접근 권한이 없습니다.",
         ERROR_CONFLICT: "데이터 충돌이 발생했습니다.",
         ERROR_INTERNAL: "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-    }, en: {
+    },
+    en: {
         AUTH_INVALID_CREDENTIALS: "Invalid username (or email) or password.",
         AUTH_TOKEN_REQUIRED: "Authentication required. Please sign in.",
         AUTH_TOKEN_INVALID: "Your session has expired or is invalid.",
@@ -130,12 +170,16 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         AUTH_INVALID_USERNAME: "Username must be 3-50 alphanumeric characters or underscores.",
         AUTH_INVALID_EMAIL: "Please enter a valid email address.",
         AUTH_PASSWORD_TOO_SHORT: "Password must be at least 8 characters long.",
+        TOTP_INVALID_CODE: "Invalid two-factor authentication code.",
+        TOTP_ALREADY_ENABLED: "Two-factor authentication is already active.",
 
         USER_NOT_FOUND: "User not found.",
         USER_CANNOT_FOLLOW_SELF: "You cannot follow yourself.",
         USER_PROFILE_UPDATE_FAILED: "Failed to update profile: {detail}",
         USER_FOLLOW_FAILED: "Failed to follow user: {detail}",
         USER_UNFOLLOW_FAILED: "Failed to unfollow user: {detail}",
+        USER_BLOCKED: "Cannot interact with a blocked user.",
+        CANNOT_BLOCK_SELF: "You cannot block yourself.",
 
         STORY_NOT_FOUND: "Story not found.",
         STORY_AUTHOR_NOT_FOUND: "Story author not found.",
@@ -151,7 +195,11 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         POST_DELETE_FAILED: "Failed to delete post: {detail}",
         POST_LIKE_FAILED: "Failed to like post: {detail}",
         POST_UNLIKE_FAILED: "Failed to unlike post: {detail}",
-        POST_CONTENT_INVALID: "Post content cannot be empty (max 2,000 characters).",
+        POST_ALREADY_REPOSTED: "Post has already been reposted.",
+        POST_CONTENT_INVALID: "Post content cannot be empty (max 5,000 characters).",
+
+        POLL_ALREADY_VOTED: "You have already voted in this poll.",
+        POLL_EXPIRED: "Voting period has ended.",
 
         COMMENT_NOT_FOUND: "Comment not found.",
         COMMENT_AUTHOR_NOT_FOUND: "Comment author not found.",
@@ -166,6 +214,19 @@ export const ERROR_MESSAGES: Record<SupportedLocale, Record<string, string>> = {
         DM_SENDER_NOT_FOUND: "Message sender not found.",
         DM_RECIPIENT_NOT_FOUND: "Message recipient not found.",
         DM_CONTENT_INVALID: "Direct message cannot be empty (max 2,000 characters).",
+        CONVERSATION_NOT_FOUND: "Conversation not found.",
+
+        WIKI_ARTICLE_NOT_FOUND: "Wiki article not found.",
+        WIKI_ARTICLE_TITLE_INVALID: "Article title must be 1-100 characters.",
+        WIKI_ARTICLE_CONTENT_INVALID: "Article content cannot be empty.",
+        WIKI_ARTICLE_COORDINATES_INVALID: "Coordinates out of geographic range.",
+        WIKI_ARTICLE_TAGS_INVALID: "Maximum 15 tags allowed.",
+        WIKI_ARTICLE_CREATE_FAILED: "Failed to create wiki article: {detail}",
+        WIKI_ARTICLE_UPDATE_FAILED: "Failed to update wiki article: {detail}",
+        WIKI_ARTICLE_DELETE_FAILED: "Failed to delete wiki article: {detail}",
+
+        RATE_LIMIT_EXCEEDED: "Too many requests. Please slow down.",
+        INVALID_CURSOR: "Invalid or expired pagination cursor.",
 
         ERROR_NOT_FOUND: "Requested resource was not found.",
         ERROR_BAD_REQUEST: "Invalid request: {detail}",

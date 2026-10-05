@@ -1,4 +1,4 @@
-// Reusable Post Fields Selection Fragment
+// Reusable Post Fields Selection Fragment compatible with Serve GraphQL schema
 export const POST_FIELDS = `
   id
   content
@@ -6,11 +6,11 @@ export const POST_FIELDS = `
   likesCount
   repostsCount
   isLikedBy
-  isLikedByMe
   isRepostedByMe
-  isBookmarkedByMe
+  isSavedByMe
   viewsCount
   audience
+  hashtags
   author {
     id
     username
@@ -31,6 +31,7 @@ export const POST_FIELDS = `
     question
     isExpired
     totalVotes
+    userVotedOptionId
     options {
       id
       optionText
@@ -66,7 +67,7 @@ export const POST_FIELDS = `
       avatarUrl
     }
   }
-  comments {
+  comments(topLevelOnly: false) {
     id
     content
     parentId
