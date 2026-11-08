@@ -236,6 +236,10 @@ impl Database {
                         "0016_wiki_map",
                         include_str!("../../../migrations/0016_wiki_map.sql"),
                     ),
+                    (
+                        "0017_refresh_tokens",
+                        include_str!("../../../migrations/0017_refresh_tokens.sql"),
+                    ),
                 ];
 
                 for (name, sql) in migrations {
