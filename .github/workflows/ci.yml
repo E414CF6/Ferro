@@ -1,0 +1,67 @@
+name: Serve CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: Lint & Test Serve
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: serve
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: serve
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Serve -> target
+
+      - name: Check Formatting
+        run: cargo fmt --manifest-path Serve/Cargo.toml -- --check
+
+      - name: Clippy Linter
+        run: cargo clippy --manifest-path Serve/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run Test Suite
+        env:
+          DATABASE_URL: postgres://serve:password@localhost:5432/serve
+          REDIS_URL: redis://127.0.0.1:6379
+        run: cargo test --manifest-path Serve/Cargo.toml --all-targets

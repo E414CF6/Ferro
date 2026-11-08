@@ -5,12 +5,21 @@
 *.swp
 *.swo
 
+# Xcode / iOS
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.xcscmblueprint
+
 # Rust
 /Serve/target/
 **/target/
 *.rs.bk
 
 # Node.js / Next.js
+/Vision/Web/node_modules/
+/Vision/Web/.next/
+/Vision/Web/out/
 /Vision/node_modules/
 /Vision/.next/
 /Vision/out/
