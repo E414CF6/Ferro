@@ -1,16 +1,22 @@
 # Ferro
 
-Ferro is a high-performance, full-stack social networking platform built with a modular Rust backend, a native Android client using Jetpack Compose, and a modern Next.js web application.
+Ferro is a high-performance, full-stack social networking platform built with a modular Rust backend, a native Android
+client using Jetpack Compose, and a modern Next.js web application.
 
 ---
 
 ## Key Capabilities
 
-- **Ephemeral Stories**: 24-hour auto-expiring media stories with real-time viewer analytics, author-restricted viewer lists, and unread indicator rings.
-- **Direct Messaging (DM)**: Real-time 1:1 private conversations featuring unread counters, message snippets, and read receipt checkmarks.
-- **Interactive Feed and Posts**: Dual feed modes (Following and Explore), live voting polls with real-time percentages, quote posts, multi-media attachments, nested comments, and optimistic bookmarking and liking.
-- **Discovery and Search**: Full-text post content search, trending hashtags, and creator recommendations with instant follow actions.
-- **Security and User Profiles**: Two-factor authentication (2FA TOTP), handle-based user queries, customizable banners, avatars, bios, and follower statistics.
+- **Ephemeral Stories**: 24-hour auto-expiring media stories with real-time viewer analytics, author-restricted viewer
+  lists, and unread indicator rings.
+- **Direct Messaging (DM)**: Real-time 1:1 private conversations featuring unread counters, message snippets, and read
+  receipt checkmarks.
+- **Interactive Feed and Posts**: Dual feed modes (Following and Explore), live voting polls with real-time percentages,
+  quote posts, multi-media attachments, nested comments, and optimistic bookmarking and liking.
+- **Discovery and Search**: Full-text post content search, trending hashtags, and creator recommendations with instant
+  follow actions.
+- **Security and User Profiles**: Two-factor authentication (2FA TOTP), handle-based user queries, customizable banners,
+  avatars, bios, and follower statistics.
 
 ---
 
@@ -102,6 +108,7 @@ Open `http://localhost:3000` in your web browser.
 ### 3. Native Android Client (`Vision/Android` - Roadmap)
 
 A native Android client using Jetpack Compose and MVI / Clean Architecture is planned. When available:
+
 1. Open `Vision/Android` in Android Studio.
 2. Sync the project with Gradle files.
 3. Run on an Android Emulator (connected via `http://10.0.2.2:8080/graphql`).

@@ -3,44 +3,98 @@
 
 CREATE TABLE IF NOT EXISTS wiki_articles
 (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID REFERENCES users (id) ON DELETE SET NULL,
-    title       VARCHAR(255)     NOT NULL,
-    slug        VARCHAR(255)     NOT NULL UNIQUE,
-    summary     TEXT,
-    content     TEXT             NOT NULL,
-    latitude    DOUBLE PRECISION NOT NULL,
-    longitude   DOUBLE PRECISION NOT NULL,
-    zoom        DOUBLE PRECISION NOT NULL DEFAULT 14.0,
-    category    VARCHAR(100)     NOT NULL DEFAULT '장소',
-    tags        TEXT             NOT NULL DEFAULT '[]',
-    geojson     TEXT,
-    author      VARCHAR(100)     NOT NULL DEFAULT '익명',
-    views       BIGINT           NOT NULL DEFAULT 0,
-    created_at  TIMESTAMPTZ      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMPTZ      NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    id
+    UUID
+    PRIMARY
+    KEY
+    DEFAULT
+    gen_random_uuid
+(
+),
+    user_id UUID REFERENCES users
+(
+    id
+) ON DELETE SET NULL,
+    title VARCHAR
+(
+    255
+) NOT NULL,
+    slug VARCHAR
+(
+    255
+) NOT NULL UNIQUE,
+    summary TEXT,
+    content TEXT NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    zoom DOUBLE PRECISION NOT NULL DEFAULT 14.0,
+    category VARCHAR
+(
+    100
+) NOT NULL DEFAULT '장소',
+    tags TEXT NOT NULL DEFAULT '[]',
+    geojson TEXT,
+    author VARCHAR
+(
+    100
+) NOT NULL DEFAULT '익명',
+    views BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 
 CREATE TABLE IF NOT EXISTS wiki_revisions
 (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    article_id   UUID             NOT NULL REFERENCES wiki_articles (id) ON DELETE CASCADE,
-    user_id      UUID REFERENCES users (id) ON DELETE SET NULL,
-    title        VARCHAR(255)     NOT NULL,
-    content      TEXT             NOT NULL,
-    latitude     DOUBLE PRECISION NOT NULL,
-    longitude    DOUBLE PRECISION NOT NULL,
-    edit_summary VARCHAR(255),
-    author       VARCHAR(100)     NOT NULL DEFAULT '익명',
-    created_at   TIMESTAMPTZ      NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    id
+    UUID
+    PRIMARY
+    KEY
+    DEFAULT
+    gen_random_uuid
+(
+),
+    article_id UUID NOT NULL REFERENCES wiki_articles
+(
+    id
+) ON DELETE CASCADE,
+    user_id UUID REFERENCES users
+(
+    id
+) ON DELETE SET NULL,
+    title VARCHAR
+(
+    255
+) NOT NULL,
+    content TEXT NOT NULL,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    edit_summary VARCHAR
+(
+    255
+),
+    author VARCHAR
+(
+    100
+) NOT NULL DEFAULT '익명',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 
 CREATE TABLE IF NOT EXISTS wiki_view_logs
 (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    article_id UUID        NOT NULL REFERENCES wiki_articles (id) ON DELETE CASCADE,
+    id
+    UUID
+    PRIMARY
+    KEY
+    DEFAULT
+    gen_random_uuid
+(
+),
+    article_id UUID NOT NULL REFERENCES wiki_articles
+(
+    id
+) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    );
 
 -- Indexes for performance and geolocation querying
 CREATE INDEX IF NOT EXISTS idx_wiki_articles_lat_lng ON wiki_articles (latitude, longitude);

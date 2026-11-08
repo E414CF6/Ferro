@@ -1,11 +1,28 @@
 -- Reposts and Quote Posts support
 CREATE TABLE IF NOT EXISTS reposts
 (
-    user_id    UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    post_id    UUID        NOT NULL REFERENCES posts (id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (user_id, post_id)
-);
+    user_id
+    UUID
+    NOT
+    NULL
+    REFERENCES
+    users
+(
+    id
+) ON DELETE CASCADE,
+    post_id UUID NOT NULL REFERENCES posts
+(
+    id
+) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW
+(
+),
+    PRIMARY KEY
+(
+    user_id,
+    post_id
+)
+    );
 
 CREATE INDEX IF NOT EXISTS idx_reposts_user ON reposts (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reposts_post ON reposts (post_id);
