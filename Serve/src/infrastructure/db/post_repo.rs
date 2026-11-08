@@ -85,31 +85,41 @@ impl PostRepository for Database {
         .unwrap_or(0) as usize
     }
 
-    async fn get_liked_posts_by_user(&self, user_id: Uuid) -> Vec<Post> {
+    async fn get_liked_posts_by_user(&self, user_id: Uuid) -> Result<Vec<Post>, DomainError> {
         let entities: Vec<PostEntity> = db_fetch_all!(
             self,
             PostEntity,
             "SELECT p.* FROM posts p JOIN likes l ON p.id = l.post_id WHERE l.user_id = $1 ORDER BY l.created_at DESC",
             user_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, user_id = %user_id, "Failed to get liked posts");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get liked posts")
+        })?;
 
-        entities.into_iter().map(Post::from).collect()
+        Ok(entities.into_iter().map(Post::from).collect())
     }
 
-    async fn get_comments_by_user(&self, user_id: Uuid) -> Vec<Comment> {
+    async fn get_comments_by_user(&self, user_id: Uuid) -> Result<Vec<Comment>, DomainError> {
         let entities: Vec<CommentEntity> = db_fetch_all!(
             self,
             CommentEntity,
             "SELECT * FROM comments WHERE author_id = $1 ORDER BY created_at DESC",
             user_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, user_id = %user_id, "Failed to get comments by user");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get comments by user")
+        })?;
 
-        entities.into_iter().map(Comment::from).collect()
+        Ok(entities.into_iter().map(Comment::from).collect())
     }
 
-    async fn get_posts(&self, limit: Option<usize>, offset: Option<usize>) -> Vec<Post> {
+    async fn get_posts(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<Post>, DomainError> {
         let lim = limit.unwrap_or(50) as i64;
         let off = offset.unwrap_or(0) as i64;
         let entities: Vec<PostEntity> = db_fetch_all!(
@@ -119,16 +129,19 @@ impl PostRepository for Database {
             lim,
             off
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, "Failed to get posts");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get posts")
+        })?;
 
-        entities.into_iter().map(Post::from).collect()
+        Ok(entities.into_iter().map(Post::from).collect())
     }
 
     async fn get_posts_cursor(
         &self,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<PostEntity> = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -151,32 +164,44 @@ impl PostRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, "Failed to get posts cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get posts cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
-    async fn get_post_by_id(&self, id: Uuid) -> Option<Post> {
-        let entity: Option<PostEntity> =
-            db_fetch_optional!(self, PostEntity, "SELECT * FROM posts WHERE id = $1", id)
-                .ok()
-                .flatten();
+    async fn get_post_by_id(&self, id: Uuid) -> Result<Option<Post>, DomainError> {
+        let entity: Option<PostEntity> = db_fetch_optional!(
+            self,
+            PostEntity,
+            "SELECT * FROM posts WHERE id = $1",
+            id
+        )
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, id = %id, "Failed to get post by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get post by id")
+        })?;
 
-        entity.map(Post::from)
+        Ok(entity.map(Post::from))
     }
 
-    async fn get_posts_by_author(&self, author_id: Uuid) -> Vec<Post> {
+    async fn get_posts_by_author(&self, author_id: Uuid) -> Result<Vec<Post>, DomainError> {
         let entities: Vec<PostEntity> = db_fetch_all!(
             self,
             PostEntity,
             "SELECT * FROM posts WHERE author_id = $1 ORDER BY created_at DESC, id DESC",
             author_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, author_id = %author_id, "Failed to get posts by author");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get posts by author")
+        })?;
 
-        entities.into_iter().map(Post::from).collect()
+        Ok(entities.into_iter().map(Post::from).collect())
     }
 
     async fn create_post(
@@ -546,7 +571,7 @@ impl PostRepository for Database {
     ) -> Result<Post, DomainError> {
         let _ = self
             .get_post_by_id(quote_post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Target post not found"))?;
 
         let id = Uuid::new_v4();
@@ -609,7 +634,7 @@ impl PostRepository for Database {
         }
 
         self.get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))
     }
 
@@ -640,7 +665,7 @@ impl PostRepository for Database {
         user_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<Post> {
+    ) -> Result<Vec<Post>, DomainError> {
         let lim = limit.unwrap_or(50) as i64;
         let off = offset.unwrap_or(0) as i64;
         let entities: Vec<PostEntity> = db_fetch_all!(
@@ -665,9 +690,12 @@ impl PostRepository for Database {
             lim,
             off
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, user_id = %user_id, "Failed to get feed");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get feed")
+        })?;
 
-        entities.into_iter().map(Post::from).collect()
+        Ok(entities.into_iter().map(Post::from).collect())
     }
 
     async fn get_feed_cursor(
@@ -675,7 +703,7 @@ impl PostRepository for Database {
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<PostEntity> = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -724,14 +752,17 @@ impl PostRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, user_id = %user_id, "Failed to get feed cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get feed cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
-    async fn search_posts(&self, query: &str) -> Vec<Post> {
+    async fn search_posts(&self, query: &str) -> Result<Vec<Post>, DomainError> {
         let search_pattern = format!("%{}%", query);
         let entities: Vec<PostEntity> = db_fetch_all!(
             self,
@@ -739,9 +770,12 @@ impl PostRepository for Database {
             "SELECT * FROM posts WHERE content LIKE $1 ORDER BY created_at DESC, id DESC LIMIT 50",
             &search_pattern
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, query = %query, "Failed to search posts");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to search posts")
+        })?;
 
-        entities.into_iter().map(Post::from).collect()
+        Ok(entities.into_iter().map(Post::from).collect())
     }
 
     async fn search_posts_cursor(
@@ -749,7 +783,7 @@ impl PostRepository for Database {
         query: &str,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let search_pattern = format!("%{}%", query);
         let entities: Vec<PostEntity> = match after {
@@ -777,11 +811,14 @@ impl PostRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, query = %query, "Failed to search posts cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to search posts cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     async fn get_posts_by_hashtag_cursor(
@@ -789,7 +826,7 @@ impl PostRepository for Database {
         hashtag: &str,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let tag_lower = hashtag.trim_start_matches('#').to_lowercase();
 
@@ -822,18 +859,21 @@ impl PostRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, hashtag = %hashtag, "Failed to get posts by hashtag");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get posts by hashtag")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     // Likes & Reposts
     async fn like_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
         let post = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let _ = db_execute!(
@@ -850,7 +890,7 @@ impl PostRepository for Database {
     async fn unlike_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
         let post = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let _ = db_execute!(
@@ -887,7 +927,7 @@ impl PostRepository for Database {
     async fn repost_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
         let post = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let _ = db_execute!(
@@ -904,7 +944,7 @@ impl PostRepository for Database {
     async fn unrepost_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
         let post = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let _ = db_execute!(
@@ -938,7 +978,10 @@ impl PostRepository for Database {
         .unwrap_or(false)
     }
 
-    async fn get_trending_hashtags(&self, limit: Option<usize>) -> Vec<(String, usize)> {
+    async fn get_trending_hashtags(
+        &self,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, usize)>, DomainError> {
         let lim = limit.unwrap_or(10) as i64;
         let entities: Vec<HashtagEntity> = db_fetch_all!(
             self,
@@ -946,12 +989,15 @@ impl PostRepository for Database {
             "SELECT * FROM hashtags ORDER BY posts_count DESC LIMIT $1",
             lim
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, "Failed to get trending hashtags");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get trending hashtags")
+        })?;
 
-        entities
+        Ok(entities
             .into_iter()
             .map(|h| (h.name, h.posts_count as usize))
-            .collect()
+            .collect())
     }
 
     // 1. Media Attachments
@@ -962,7 +1008,7 @@ impl PostRepository for Database {
     ) -> Result<Vec<PostMedia>, DomainError> {
         let _ = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         for m in &media {
@@ -989,16 +1035,19 @@ impl PostRepository for Database {
         Ok(media)
     }
 
-    async fn get_post_media(&self, post_id: Uuid) -> Vec<PostMedia> {
+    async fn get_post_media(&self, post_id: Uuid) -> Result<Vec<PostMedia>, DomainError> {
         let entities: Vec<PostMediaEntity> = db_fetch_all!(
             self,
             PostMediaEntity,
             "SELECT * FROM post_media WHERE post_id = $1 ORDER BY sort_order ASC, created_at ASC",
             post_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, post_id = %post_id, "Failed to get post media");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get post media")
+        })?;
 
-        entities.into_iter().map(PostMedia::from).collect()
+        Ok(entities.into_iter().map(PostMedia::from).collect())
     }
 
     // 2. User Lists & Custom Feeds
@@ -1059,7 +1108,7 @@ impl PostRepository for Database {
     ) -> Result<UserList, DomainError> {
         let current = self
             .get_user_list_by_id(list_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::ListNotFound, "User list not found"))?;
 
         if current.owner_id != owner_id {
@@ -1095,7 +1144,7 @@ impl PostRepository for Database {
         }
 
         self.get_user_list_by_id(list_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::ListNotFound, "User list not found"))
     }
 
@@ -1129,7 +1178,7 @@ impl PostRepository for Database {
     ) -> Result<bool, DomainError> {
         let list = self
             .get_user_list_by_id(list_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::ListNotFound, "User list not found"))?;
 
         if list.owner_id != owner_id {
@@ -1158,7 +1207,7 @@ impl PostRepository for Database {
     ) -> Result<bool, DomainError> {
         let list = self
             .get_user_list_by_id(list_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::ListNotFound, "User list not found"))?;
 
         if list.owner_id != owner_id {
@@ -1178,41 +1227,49 @@ impl PostRepository for Database {
         Ok(true)
     }
 
-    async fn get_user_lists(&self, user_id: Uuid) -> Vec<UserList> {
+    async fn get_user_lists(&self, user_id: Uuid) -> Result<Vec<UserList>, DomainError> {
         let entities: Vec<UserListEntity> = db_fetch_all!(
             self,
             UserListEntity,
             "SELECT * FROM user_lists WHERE owner_id = $1 ORDER BY created_at DESC",
             user_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, user_id = %user_id, "Failed to get user lists");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user lists")
+        })?;
 
-        entities.into_iter().map(UserList::from).collect()
+        Ok(entities.into_iter().map(UserList::from).collect())
     }
 
-    async fn get_user_list_by_id(&self, list_id: Uuid) -> Option<UserList> {
+    async fn get_user_list_by_id(&self, list_id: Uuid) -> Result<Option<UserList>, DomainError> {
         let entity: Option<UserListEntity> = db_fetch_optional!(
             self,
             UserListEntity,
             "SELECT * FROM user_lists WHERE id = $1",
             list_id
         )
-        .ok()
-        .flatten();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, list_id = %list_id, "Failed to get user list by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user list by id")
+        })?;
 
-        entity.map(UserList::from)
+        Ok(entity.map(UserList::from))
     }
 
-    async fn get_list_members(&self, list_id: Uuid) -> Vec<User> {
+    async fn get_list_members(&self, list_id: Uuid) -> Result<Vec<User>, DomainError> {
         let entities: Vec<UserEntity> = db_fetch_all!(
             self,
             UserEntity,
             "SELECT u.* FROM users u JOIN user_list_members ulm ON u.id = ulm.user_id WHERE ulm.list_id = $1",
             list_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, list_id = %list_id, "Failed to get list members");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get list members")
+        })?;
 
-        entities.into_iter().map(User::from).collect()
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
     async fn get_list_feed_cursor(
@@ -1220,7 +1277,7 @@ impl PostRepository for Database {
         list_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<PostEntity> = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -1249,11 +1306,14 @@ impl PostRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::post_repo", error = %e, list_id = %list_id, "Failed to get list feed cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get list feed cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     // 3. Post Views & Analytics
@@ -1278,7 +1338,7 @@ impl PostRepository for Database {
     async fn get_post_analytics(&self, post_id: Uuid) -> Result<PostAnalytics, DomainError> {
         let _ = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let likes = self.get_likes_count(post_id).await;

@@ -52,7 +52,7 @@ impl DirectMessageGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let user = db.get_user_by_id(self.0.sender_id).await.ok_or_else(|| {
+            let user = db.get_user_by_id(self.0.sender_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::DmSenderNotFound, "Sender user not found").extend()
             })?;
             Ok(UserGql(user))
@@ -71,7 +71,7 @@ impl DirectMessageGql {
             let db = ctx.data::<Database>()?;
             let user = db
                 .get_user_by_id(self.0.recipient_id)
-                .await
+                .await?
                 .ok_or_else(|| {
                     DomainError::new(ErrorCode::DmRecipientNotFound, "Recipient user not found")
                         .extend()
@@ -171,12 +171,12 @@ impl GroupConversationGql {
             return Ok(None);
         };
         let db = ctx.data::<Database>()?;
-        Ok(db.get_user_by_id(cid).await.map(UserGql))
+        Ok(db.get_user_by_id(cid).await?.map(UserGql))
     }
 
     async fn participants(&self, ctx: &Context<'_>) -> Result<Vec<UserGql>> {
         let db = ctx.data::<Database>()?;
-        let users = db.get_conversation_participants(self.0.id).await;
+        let users = db.get_conversation_participants(self.0.id).await?;
         Ok(users.into_iter().map(UserGql).collect())
     }
 
@@ -187,7 +187,9 @@ impl GroupConversationGql {
         offset: Option<usize>,
     ) -> Result<Vec<DirectMessageGql>> {
         let db = ctx.data::<Database>()?;
-        let msgs = db.get_conversation_messages(self.0.id, limit, offset).await;
+        let msgs = db
+            .get_conversation_messages(self.0.id, limit, offset)
+            .await?;
         Ok(msgs.into_iter().map(DirectMessageGql).collect())
     }
 }

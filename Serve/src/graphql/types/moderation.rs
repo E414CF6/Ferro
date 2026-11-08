@@ -136,9 +136,12 @@ impl ReportGql {
 
     async fn reporter(&self, ctx: &Context<'_>) -> Result<UserGql> {
         let db = ctx.data::<Database>()?;
-        let user = db.get_user_by_id(self.0.reporter_id).await.ok_or_else(|| {
-            DomainError::new(ErrorCode::UserNotFound, "Reporter not found").extend()
-        })?;
+        let user = db
+            .get_user_by_id(self.0.reporter_id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::new(ErrorCode::UserNotFound, "Reporter not found").extend()
+            })?;
         Ok(UserGql(user))
     }
 }

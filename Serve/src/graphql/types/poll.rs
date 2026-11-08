@@ -41,10 +41,10 @@ impl PollGql {
     async fn user_voted_option_id(&self, ctx: &Context<'_>) -> Result<Option<ID>> {
         if let Some(auth_user) = ctx.data_opt::<AuthUser>() {
             let db = ctx.data::<Database>()?;
-            Ok(db
+            let vote = db
                 .get_user_vote_for_poll(self.0.id, auth_user.user_id)
-                .await
-                .map(|id| ID(id.to_string())))
+                .await?;
+            Ok(vote.map(|id| ID(id.to_string())))
         } else {
             Ok(None)
         }
@@ -56,7 +56,7 @@ impl PollGql {
             Ok(opts.into_iter().map(PollOptionGql).collect())
         } else {
             let db = ctx.data::<Database>()?;
-            let opts = db.get_poll_options(self.0.id).await;
+            let opts = db.get_poll_options(self.0.id).await?;
             Ok(opts.into_iter().map(PollOptionGql).collect())
         }
     }
@@ -105,7 +105,7 @@ impl PollOptionGql {
             let db = ctx.data::<Database>()?;
             let user_vote = db
                 .get_user_vote_for_poll(self.0.poll_id, auth_user.user_id)
-                .await;
+                .await?;
             Ok(user_vote == Some(self.0.id))
         } else {
             Ok(false)

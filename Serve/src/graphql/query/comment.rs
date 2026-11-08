@@ -1,7 +1,6 @@
-use crate::domain::repositories::CommentRepository;
+use crate::application::AppServices;
 use crate::graphql::types::CommentGql;
-use crate::infrastructure::db::postgres::Database;
-use async_graphql::{Context, ID, Object, Result};
+use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -11,8 +10,13 @@ pub struct CommentQuery;
 impl CommentQuery {
     /// Get single comment by ID
     async fn comment(&self, ctx: &Context<'_>, id: ID) -> Result<Option<CommentGql>> {
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let cid = Uuid::parse_str(&id)?;
-        Ok(db.get_comment_by_id(cid).await.map(CommentGql))
+        let comment = services
+            .comment
+            .get_comment_by_id(cid)
+            .await
+            .map_err(|e| e.extend())?;
+        Ok(comment.map(CommentGql))
     }
 }

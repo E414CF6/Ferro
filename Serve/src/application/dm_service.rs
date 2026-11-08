@@ -37,19 +37,34 @@ impl<R: DmRepository> DmService<R> {
             .await
     }
 
+    pub async fn get_direct_messages(
+        &self,
+        user1_id: Uuid,
+        user2_id: Uuid,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<DirectMessage>, DomainError> {
+        self.repo
+            .get_direct_messages(user1_id, user2_id, limit, offset)
+            .await
+    }
+
     pub async fn get_direct_messages_cursor(
         &self,
         user1_id: Uuid,
         user2_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<DirectMessage>, bool) {
+    ) -> Result<(Vec<DirectMessage>, bool), DomainError> {
         self.repo
             .get_direct_messages_cursor(user1_id, user2_id, first, after)
             .await
     }
 
-    pub async fn get_conversations(&self, user_id: Uuid) -> Vec<ConversationSummary> {
+    pub async fn get_conversations(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<ConversationSummary>, DomainError> {
         self.repo.get_conversations(user_id).await
     }
 
@@ -78,11 +93,17 @@ impl<R: DmRepository> DmService<R> {
             .await
     }
 
-    pub async fn get_conversation_by_id(&self, conversation_id: Uuid) -> Option<Conversation> {
+    pub async fn get_conversation_by_id(
+        &self,
+        conversation_id: Uuid,
+    ) -> Result<Option<Conversation>, DomainError> {
         self.repo.get_conversation_by_id(conversation_id).await
     }
 
-    pub async fn get_conversation_participants(&self, conversation_id: Uuid) -> Vec<User> {
+    pub async fn get_conversation_participants(
+        &self,
+        conversation_id: Uuid,
+    ) -> Result<Vec<User>, DomainError> {
         self.repo
             .get_conversation_participants(conversation_id)
             .await
@@ -105,7 +126,7 @@ impl<R: DmRepository> DmService<R> {
         conversation_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<DirectMessage>, bool) {
+    ) -> Result<(Vec<DirectMessage>, bool), DomainError> {
         self.repo
             .get_conversation_messages_cursor(conversation_id, first, after)
             .await
@@ -131,7 +152,10 @@ impl<R: DmRepository> DmService<R> {
         self.repo.delete_direct_message(message_id, sender_id).await
     }
 
-    pub async fn get_user_group_conversations(&self, user_id: Uuid) -> Vec<Conversation> {
+    pub async fn get_user_group_conversations(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<Conversation>, DomainError> {
         self.repo.get_user_group_conversations(user_id).await
     }
 }

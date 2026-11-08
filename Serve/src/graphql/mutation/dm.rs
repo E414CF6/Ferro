@@ -1,10 +1,9 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::events::EventPublisher;
 use crate::domain::models::TypingEvent;
-use crate::domain::repositories::{DmRepository, UserRepository};
 use crate::graphql::types::{DirectMessageGql, GroupConversationGql};
-use crate::infrastructure::db::postgres::Database;
 use crate::infrastructure::pubsub::MessageBroker;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
@@ -33,9 +32,9 @@ impl DmMutation {
             .extend());
         }
 
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
 
-        if db.is_blocked_between(sen_id, rec_id).await {
+        if services.social.is_blocked_between(sen_id, rec_id).await {
             return Err(
                 DomainError::new(ErrorCode::UserBlocked, "Cannot message blocked user").extend(),
             );
@@ -44,7 +43,8 @@ impl DmMutation {
         let valid_content =
             crate::domain::validation::validate_dm_content(&content).map_err(|e| e.extend())?;
 
-        let msg = db
+        let msg = services
+            .dm
             .send_direct_message(sen_id, rec_id, valid_content)
             .await
             .map_err(|e| e.extend())?;
@@ -71,8 +71,9 @@ impl DmMutation {
             member_uuids.push(pid);
         }
 
-        let db = ctx.data::<Database>()?;
-        let convo = db
+        let services = ctx.data::<AppServices>()?;
+        let convo = services
+            .dm
             .create_group_conversation(cid, title, member_uuids)
             .await
             .map_err(|e| e.extend())?;
@@ -93,8 +94,9 @@ impl DmMutation {
         let valid_content =
             crate::domain::validation::validate_dm_content(&content).map_err(|e| e.extend())?;
 
-        let db = ctx.data::<Database>()?;
-        let msg = db
+        let services = ctx.data::<AppServices>()?;
+        let msg = services
+            .dm
             .send_conversation_message(sid, cid, valid_content)
             .await
             .map_err(|e| e.extend())?;
@@ -152,8 +154,9 @@ impl DmMutation {
         let valid_content =
             crate::domain::validation::validate_dm_content(&content).map_err(|e| e.extend())?;
 
-        let db = ctx.data::<Database>()?;
-        let msg = db
+        let services = ctx.data::<AppServices>()?;
+        let msg = services
+            .dm
             .edit_direct_message(mid, sid, valid_content)
             .await
             .map_err(|e| e.extend())?;
@@ -170,8 +173,10 @@ impl DmMutation {
     ) -> Result<bool> {
         let sid = resolve_user_id(ctx, sender_id)?;
         let mid = Uuid::parse_str(&message_id)?;
-        let db = ctx.data::<Database>()?;
-        db.delete_direct_message(mid, sid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .dm
+            .delete_direct_message(mid, sid)
             .await
             .map_err(|e| e.extend())
     }
@@ -185,8 +190,10 @@ impl DmMutation {
     ) -> Result<bool> {
         let rdr_id = resolve_user_id(ctx, reader_id)?;
         let sen_id = Uuid::parse_str(&sender_id)?;
-        let db = ctx.data::<Database>()?;
-        db.mark_direct_messages_as_read(rdr_id, sen_id)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .dm
+            .mark_direct_messages_as_read(rdr_id, sen_id)
             .await
             .map_err(|e| e.extend())
     }

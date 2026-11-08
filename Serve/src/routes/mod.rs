@@ -36,10 +36,18 @@ pub struct AppState {
 impl AppState {
     pub fn new(schema: SnsSchema, db: Database, config: AppConfig) -> Self {
         let storage = StorageService::from_config(&config.storage);
-        let rate_limiter = RateLimiter::new(
-            config.rate_limit.max_requests,
-            Duration::from_secs(config.rate_limit.window_secs),
-        );
+        let rate_limiter = if config.redis.enabled {
+            RateLimiter::with_redis(
+                config.rate_limit.max_requests,
+                Duration::from_secs(config.rate_limit.window_secs),
+                &config.redis.url,
+            )
+        } else {
+            RateLimiter::new(
+                config.rate_limit.max_requests,
+                Duration::from_secs(config.rate_limit.window_secs),
+            )
+        };
         Self {
             schema,
             db,

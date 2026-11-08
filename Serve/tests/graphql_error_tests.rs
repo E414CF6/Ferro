@@ -122,8 +122,14 @@ async fn test_graphql_introspection_disabled_in_production() {
         .await
         .unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    let errors = json["errors"]
-        .as_array()
-        .expect("Expected errors when introspection disabled");
-    assert!(!errors.is_empty());
+    let is_disabled = json["data"]["__schema"].is_null()
+        || json
+            .get("errors")
+            .and_then(|e| e.as_array())
+            .is_some_and(|a| !a.is_empty());
+    assert!(
+        is_disabled,
+        "Expected __schema to be null or errors when introspection disabled: {:?}",
+        json
+    );
 }

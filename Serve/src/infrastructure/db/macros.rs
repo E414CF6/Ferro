@@ -134,3 +134,23 @@ macro_rules! db_scalar {
         }
     };
 }
+
+#[macro_export]
+macro_rules! db_scalar_optional {
+    ($db:expr, $ty:ty, $sql:expr $(, $bind:expr)*) => {
+        match $db.backend() {
+            $crate::infrastructure::db::postgres::DatabaseBackend::Postgres(pool) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_scalar::<sqlx::Postgres, $ty>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_optional(pool).await
+            }
+            $crate::infrastructure::db::postgres::DatabaseBackend::Sqlite(pool) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_scalar::<sqlx::Sqlite, $ty>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_optional(pool).await
+            }
+        }
+    };
+}

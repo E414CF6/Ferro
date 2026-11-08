@@ -52,19 +52,88 @@ pub fn validate_image_magic_bytes(data: &[u8]) -> Option<(&'static str, &'static
         }
 
         // HEIC: High Efficiency Image Coding (HEVC-based)
-        if header.windows(4).any(|w| {
-            matches!(w, b"heic" | b"heix" | b"heim" | b"heis" | b"hevc" | b"hevx")
-        }) {
+        if header
+            .windows(4)
+            .any(|w| matches!(w, b"heic" | b"heix" | b"heim" | b"heis" | b"hevc" | b"hevx"))
+        {
             return Some(("heic", "image/heic"));
         }
 
         // Generic HEIF / MIAF
-        if header.windows(4).any(|w| matches!(w, b"mif1" | b"msf1" | b"miaf")) {
+        if header
+            .windows(4)
+            .any(|w| matches!(w, b"mif1" | b"msf1" | b"miaf"))
+        {
             return Some(("heif", "image/heif"));
         }
     }
 
     None
+}
+
+/// Strips JPEG APP1 markers containing EXIF metadata (GPS coordinates, camera info)
+/// while preserving the image stream.
+pub fn strip_jpeg_exif(data: &[u8]) -> Vec<u8> {
+    if data.len() < 4 || data[0] != 0xFF || data[1] != 0xD8 {
+        return data.to_vec();
+    }
+
+    let mut out = Vec::with_capacity(data.len());
+    out.extend_from_slice(&[0xFF, 0xD8]); // SOI
+
+    let mut i = 2;
+    while i < data.len() {
+        if data[i] != 0xFF {
+            out.extend_from_slice(&data[i..]);
+            break;
+        }
+
+        while i < data.len() && data[i] == 0xFF {
+            i += 1;
+        }
+        if i >= data.len() {
+            out.push(0xFF);
+            break;
+        }
+
+        let marker = data[i];
+        i += 1;
+
+        if marker == 0xDA || marker == 0xD9 {
+            out.push(0xFF);
+            out.push(marker);
+            out.extend_from_slice(&data[i..]);
+            break;
+        }
+
+        if i + 2 > data.len() {
+            out.push(0xFF);
+            out.push(marker);
+            out.extend_from_slice(&data[i..]);
+            break;
+        }
+
+        let len = ((data[i] as usize) << 8) | (data[i + 1] as usize);
+        if len < 2 || i + len > data.len() {
+            out.push(0xFF);
+            out.push(marker);
+            out.extend_from_slice(&data[i..]);
+            break;
+        }
+
+        // Marker 0xE1 is APP1 (EXIF / GPS metadata)
+        if marker == 0xE1 {
+            // Strip: skip this entire APP1 segment
+            i += len;
+        } else {
+            out.push(0xFF);
+            out.push(marker);
+            out.extend_from_slice(&data[i..i + len]);
+            i += len;
+        }
+    }
+
+    out
 }
 
 /// POST /api/upload
@@ -180,26 +249,32 @@ pub async fn upload_file_handler(
                 }
             };
 
+            let upload_bytes = if ext == "jpg" {
+                strip_jpeg_exif(&data)
+            } else {
+                data.to_vec()
+            };
+
             let unique_key = format!("{}.{}", Uuid::new_v4(), ext);
 
             match storage
-                .upload(&unique_key, validated_content_type, &data)
+                .upload(&unique_key, validated_content_type, &upload_bytes)
                 .await
             {
                 Ok(url) => {
                     info!(
                         target: "serve::upload",
                         key = %unique_key,
-                        size = data.len(),
+                        size = upload_bytes.len(),
                         user_id = %auth_user.user_id,
                         username = %auth_user.username,
                         content_type = %validated_content_type,
-                        "Image uploaded successfully"
+                        "Image uploaded successfully (EXIF stripped for JPG)"
                     );
                     uploaded_file = Some(json!({
                         "url": url,
                         "key": unique_key,
-                        "size": data.len(),
+                        "size": upload_bytes.len(),
                         "content_type": validated_content_type
                     }));
                     break;
@@ -238,7 +313,10 @@ mod tests {
     #[test]
     fn test_validate_image_magic_bytes_jpeg() {
         let jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
-        assert_eq!(validate_image_magic_bytes(&jpeg), Some(("jpg", "image/jpeg")));
+        assert_eq!(
+            validate_image_magic_bytes(&jpeg),
+            Some(("jpg", "image/jpeg"))
+        );
     }
 
     #[test]
@@ -251,14 +329,23 @@ mod tests {
     fn test_validate_image_magic_bytes_gif() {
         let gif87 = b"GIF87a...";
         let gif89 = b"GIF89a...";
-        assert_eq!(validate_image_magic_bytes(gif87), Some(("gif", "image/gif")));
-        assert_eq!(validate_image_magic_bytes(gif89), Some(("gif", "image/gif")));
+        assert_eq!(
+            validate_image_magic_bytes(gif87),
+            Some(("gif", "image/gif"))
+        );
+        assert_eq!(
+            validate_image_magic_bytes(gif89),
+            Some(("gif", "image/gif"))
+        );
     }
 
     #[test]
     fn test_validate_image_magic_bytes_webp() {
         let webp = b"RIFF\x00\x00\x00\x00WEBPVP8 ...";
-        assert_eq!(validate_image_magic_bytes(webp), Some(("webp", "image/webp")));
+        assert_eq!(
+            validate_image_magic_bytes(webp),
+            Some(("webp", "image/webp"))
+        );
     }
 
     #[test]
@@ -266,7 +353,10 @@ mod tests {
         let mut heic = vec![0x00, 0x00, 0x00, 0x18];
         heic.extend_from_slice(b"ftypheic");
         heic.extend_from_slice(b"\x00\x00\x00\x00mif1heic");
-        assert_eq!(validate_image_magic_bytes(&heic), Some(("heic", "image/heic")));
+        assert_eq!(
+            validate_image_magic_bytes(&heic),
+            Some(("heic", "image/heic"))
+        );
     }
 
     #[test]
@@ -274,7 +364,10 @@ mod tests {
         let mut heif = vec![0x00, 0x00, 0x00, 0x18];
         heif.extend_from_slice(b"ftypmif1");
         heif.extend_from_slice(b"\x00\x00\x00\x00mif1miaf");
-        assert_eq!(validate_image_magic_bytes(&heif), Some(("heif", "image/heif")));
+        assert_eq!(
+            validate_image_magic_bytes(&heif),
+            Some(("heif", "image/heif"))
+        );
     }
 
     #[test]
@@ -282,14 +375,43 @@ mod tests {
         let mut avif = vec![0x00, 0x00, 0x00, 0x1c];
         avif.extend_from_slice(b"ftypavif");
         avif.extend_from_slice(b"\x00\x00\x00\x00mif1miafavif");
-        assert_eq!(validate_image_magic_bytes(&avif), Some(("avif", "image/avif")));
+        assert_eq!(
+            validate_image_magic_bytes(&avif),
+            Some(("avif", "image/avif"))
+        );
     }
 
     #[test]
     fn test_validate_image_magic_bytes_invalid() {
         assert_eq!(validate_image_magic_bytes(&[]), None);
         assert_eq!(validate_image_magic_bytes(b"HELLO WORLD"), None);
-        assert_eq!(validate_image_magic_bytes(b"\x00\x00\x00\x18ftypmp42"), None);
+        assert_eq!(
+            validate_image_magic_bytes(b"\x00\x00\x00\x18ftypmp42"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_strip_jpeg_exif() {
+        // Construct a JPEG with SOI + APP1 (Exif) + DQT + SOS
+        let exif_payload = b"Exif\0\0";
+        let exif_len = (2 + exif_payload.len()) as u16; // 8 bytes
+        let mut jpeg = vec![0xFF, 0xD8]; // SOI
+        jpeg.extend_from_slice(&[0xFF, 0xE1, (exif_len >> 8) as u8, (exif_len & 0xFF) as u8]);
+        jpeg.extend_from_slice(exif_payload);
+        jpeg.extend_from_slice(&[0xFF, 0xDB, 0x00, 0x04, 0x01, 0x02]); // DQT
+        jpeg.extend_from_slice(&[0xFF, 0xDA, 0x12, 0x34]); // SOS
+
+        let stripped = strip_jpeg_exif(&jpeg);
+        assert!(
+            !stripped.windows(2).any(|w| w == [0xFF, 0xE1]),
+            "APP1 EXIF marker should be stripped"
+        );
+        assert!(stripped.starts_with(&[0xFF, 0xD8]), "SOI preserved");
+        assert!(
+            stripped.windows(2).any(|w| w == [0xFF, 0xDB]),
+            "DQT preserved"
+        );
+        assert!(stripped.ends_with(&[0x12, 0x34]), "Image payload preserved");
     }
 }
-

@@ -40,7 +40,8 @@ impl WikiRepository for Database {
                     let clean_q = q.trim();
                     if !clean_q.is_empty() {
                         let pattern = format!("%{}%", clean_q.to_lowercase());
-                        builder.push(" AND (LOWER(title) LIKE ")
+                        builder
+                            .push(" AND (LOWER(title) LIKE ")
                             .push_bind(pattern.clone())
                             .push(" OR LOWER(COALESCE(summary, '')) LIKE ")
                             .push_bind(pattern.clone())
@@ -56,20 +57,32 @@ impl WikiRepository for Database {
                     let clean_tag = tag.trim().trim_start_matches('#');
                     if clean_tag != "전체" && !clean_tag.is_empty() {
                         let tag_pattern = format!("%\"{}\"%", clean_tag.to_lowercase());
-                        builder.push(" AND LOWER(tags) LIKE ").push_bind(tag_pattern);
+                        builder
+                            .push(" AND LOWER(tags) LIKE ")
+                            .push_bind(tag_pattern);
                     }
                 }
 
-                if let (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng)) =
-                    (filters.min_lat, filters.max_lat, filters.min_lng, filters.max_lng)
-                {
-                    builder.push(" AND latitude >= ").push_bind(min_lat)
-                        .push(" AND latitude <= ").push_bind(max_lat)
-                        .push(" AND longitude >= ").push_bind(min_lng)
-                        .push(" AND longitude <= ").push_bind(max_lng);
+                if let (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng)) = (
+                    filters.min_lat,
+                    filters.max_lat,
+                    filters.min_lng,
+                    filters.max_lng,
+                ) {
+                    builder
+                        .push(" AND latitude >= ")
+                        .push_bind(min_lat)
+                        .push(" AND latitude <= ")
+                        .push_bind(max_lat)
+                        .push(" AND longitude >= ")
+                        .push_bind(min_lng)
+                        .push(" AND longitude <= ")
+                        .push_bind(max_lng);
                 }
 
-                builder.push(" ORDER BY updated_at DESC LIMIT ").push_bind(limit);
+                builder
+                    .push(" ORDER BY updated_at DESC LIMIT ")
+                    .push_bind(limit);
 
                 let entities = builder
                     .build_query_as::<WikiArticleEntity>()
@@ -91,7 +104,8 @@ impl WikiRepository for Database {
                     let clean_q = q.trim();
                     if !clean_q.is_empty() {
                         let pattern = format!("%{}%", clean_q.to_lowercase());
-                        builder.push(" AND (LOWER(title) LIKE ")
+                        builder
+                            .push(" AND (LOWER(title) LIKE ")
                             .push_bind(pattern.clone())
                             .push(" OR LOWER(COALESCE(summary, '')) LIKE ")
                             .push_bind(pattern.clone())
@@ -107,20 +121,32 @@ impl WikiRepository for Database {
                     let clean_tag = tag.trim().trim_start_matches('#');
                     if clean_tag != "전체" && !clean_tag.is_empty() {
                         let tag_pattern = format!("%\"{}\"%", clean_tag.to_lowercase());
-                        builder.push(" AND LOWER(tags) LIKE ").push_bind(tag_pattern);
+                        builder
+                            .push(" AND LOWER(tags) LIKE ")
+                            .push_bind(tag_pattern);
                     }
                 }
 
-                if let (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng)) =
-                    (filters.min_lat, filters.max_lat, filters.min_lng, filters.max_lng)
-                {
-                    builder.push(" AND latitude >= ").push_bind(min_lat)
-                        .push(" AND latitude <= ").push_bind(max_lat)
-                        .push(" AND longitude >= ").push_bind(min_lng)
-                        .push(" AND longitude <= ").push_bind(max_lng);
+                if let (Some(min_lat), Some(max_lat), Some(min_lng), Some(max_lng)) = (
+                    filters.min_lat,
+                    filters.max_lat,
+                    filters.min_lng,
+                    filters.max_lng,
+                ) {
+                    builder
+                        .push(" AND latitude >= ")
+                        .push_bind(min_lat)
+                        .push(" AND latitude <= ")
+                        .push_bind(max_lat)
+                        .push(" AND longitude >= ")
+                        .push_bind(min_lng)
+                        .push(" AND longitude <= ")
+                        .push_bind(max_lng);
                 }
 
-                builder.push(" ORDER BY updated_at DESC LIMIT ").push_bind(limit);
+                builder
+                    .push(" ORDER BY updated_at DESC LIMIT ")
+                    .push_bind(limit);
 
                 let entities = builder
                     .build_query_as::<WikiArticleEntity>()
@@ -194,7 +220,10 @@ impl WikiRepository for Database {
             DatabaseBackend::Postgres(pool) => {
                 let mut tx = pool.begin().await.map_err(|e| {
                     error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
-                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to begin transaction")
+                    DomainError::new(
+                        ErrorCode::WikiArticleCreateFailed,
+                        "Failed to begin transaction",
+                    )
                 })?;
 
                 sqlx::query(
@@ -253,7 +282,10 @@ impl WikiRepository for Database {
             DatabaseBackend::Sqlite(pool) => {
                 let mut tx = pool.begin().await.map_err(|e| {
                     error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
-                    DomainError::new(ErrorCode::WikiArticleCreateFailed, "Failed to begin transaction")
+                    DomainError::new(
+                        ErrorCode::WikiArticleCreateFailed,
+                        "Failed to begin transaction",
+                    )
                 })?;
 
                 sqlx::query(
@@ -325,7 +357,10 @@ impl WikiRepository for Database {
             DatabaseBackend::Postgres(pool) => {
                 let mut tx = pool.begin().await.map_err(|e| {
                     error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
-                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to begin transaction")
+                    DomainError::new(
+                        ErrorCode::WikiArticleUpdateFailed,
+                        "Failed to begin transaction",
+                    )
                 })?;
 
                 sqlx::query(
@@ -349,7 +384,10 @@ impl WikiRepository for Database {
                 .await
                 .map_err(|e| {
                     error!(target: "serve::wiki_repo", error = %e, "Failed to update wiki article");
-                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to update wiki article")
+                    DomainError::new(
+                        ErrorCode::WikiArticleUpdateFailed,
+                        "Failed to update wiki article",
+                    )
                 })?;
 
                 sqlx::query(
@@ -381,7 +419,10 @@ impl WikiRepository for Database {
             DatabaseBackend::Sqlite(pool) => {
                 let mut tx = pool.begin().await.map_err(|e| {
                     error!(target: "serve::wiki_repo", error = %e, "Failed to begin transaction");
-                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to begin transaction")
+                    DomainError::new(
+                        ErrorCode::WikiArticleUpdateFailed,
+                        "Failed to begin transaction",
+                    )
                 })?;
 
                 sqlx::query(
@@ -405,7 +446,10 @@ impl WikiRepository for Database {
                 .await
                 .map_err(|e| {
                     error!(target: "serve::wiki_repo", error = %e, "Failed to update wiki article");
-                    DomainError::new(ErrorCode::WikiArticleUpdateFailed, "Failed to update wiki article")
+                    DomainError::new(
+                        ErrorCode::WikiArticleUpdateFailed,
+                        "Failed to update wiki article",
+                    )
                 })?;
 
                 sqlx::query(

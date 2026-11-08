@@ -69,15 +69,32 @@ impl<R: PostRepository> PostService<R> {
         self.repo.delete_post(post_id, author_id).await
     }
 
-    pub async fn get_post_by_id(&self, post_id: Uuid) -> Option<Post> {
+    pub async fn get_post_by_id(&self, post_id: Uuid) -> Result<Option<Post>, DomainError> {
         self.repo.get_post_by_id(post_id).await
+    }
+
+    pub async fn get_posts(
+        &self,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<Post>, DomainError> {
+        self.repo.get_posts(limit, offset).await
+    }
+
+    pub async fn get_feed(
+        &self,
+        user_id: Uuid,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<Post>, DomainError> {
+        self.repo.get_feed(user_id, limit, offset).await
     }
 
     pub async fn get_posts_cursor(
         &self,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         self.repo.get_posts_cursor(first, after).await
     }
 
@@ -86,7 +103,7 @@ impl<R: PostRepository> PostService<R> {
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         self.repo.get_feed_cursor(user_id, first, after).await
     }
 
@@ -95,10 +112,38 @@ impl<R: PostRepository> PostService<R> {
         hashtag: &str,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         self.repo
             .get_posts_by_hashtag_cursor(hashtag, first, after)
             .await
+    }
+
+    pub async fn get_posts_by_author(&self, author_id: Uuid) -> Result<Vec<Post>, DomainError> {
+        self.repo.get_posts_by_author(author_id).await
+    }
+
+    pub async fn search_posts(&self, query: &str) -> Result<Vec<Post>, DomainError> {
+        self.repo.search_posts(query).await
+    }
+
+    pub async fn search_posts_cursor(
+        &self,
+        query: &str,
+        first: usize,
+        after: Option<(DateTime<Utc>, Uuid)>,
+    ) -> Result<(Vec<Post>, bool), DomainError> {
+        self.repo.search_posts_cursor(query, first, after).await
+    }
+
+    pub async fn get_liked_posts_by_user(&self, user_id: Uuid) -> Result<Vec<Post>, DomainError> {
+        self.repo.get_liked_posts_by_user(user_id).await
+    }
+
+    pub async fn get_comments_by_user(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<crate::domain::models::Comment>, DomainError> {
+        self.repo.get_comments_by_user(user_id).await
     }
 
     pub async fn like_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
@@ -125,7 +170,7 @@ impl<R: PostRepository> PostService<R> {
         self.repo.add_post_media(post_id, media).await
     }
 
-    pub async fn get_post_media(&self, post_id: Uuid) -> Vec<PostMedia> {
+    pub async fn get_post_media(&self, post_id: Uuid) -> Result<Vec<PostMedia>, DomainError> {
         self.repo.get_post_media(post_id).await
     }
 
@@ -145,7 +190,7 @@ impl<R: PostRepository> PostService<R> {
         let post = self
             .repo
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         if post.author_id != requester_id {
@@ -158,7 +203,10 @@ impl<R: PostRepository> PostService<R> {
         self.repo.get_post_analytics(post_id).await
     }
 
-    pub async fn get_trending_hashtags(&self, limit: Option<usize>) -> Vec<(String, usize)> {
+    pub async fn get_trending_hashtags(
+        &self,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, usize)>, DomainError> {
         self.repo.get_trending_hashtags(limit).await
     }
 }

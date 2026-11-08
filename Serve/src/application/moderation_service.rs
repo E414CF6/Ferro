@@ -42,7 +42,7 @@ impl<R: ModerationRepository> ModerationService<R> {
         &self,
         status: Option<ReportStatus>,
         limit: Option<usize>,
-    ) -> Vec<Report> {
+    ) -> Result<Vec<Report>, DomainError> {
         self.repo.get_reports(status, limit).await
     }
 }

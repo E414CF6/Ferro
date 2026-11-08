@@ -132,7 +132,9 @@ async fn test_subscription_dm_security_authorization() {
     let test_file = format!("./data/test_sub_dm_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to connect SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to connect SQLite");
     let broker = MessageBroker::new(16);
     let schema = build_schema(db, AuthConfig::default(), broker.clone());
 
@@ -153,7 +155,9 @@ async fn test_subscription_dm_security_authorization() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "AUTH_TOKEN_REQUIRED"
     );
 
@@ -167,7 +171,9 @@ async fn test_subscription_dm_security_authorization() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "FORBIDDEN"
     );
 
@@ -197,14 +203,20 @@ async fn test_subscription_dm_security_authorization() {
     });
 
     let resp = stream.next().await.expect("Expected subscription item");
-    assert!(resp.errors.is_empty(), "Expected no errors: {:?}", resp.errors);
+    assert!(
+        resp.errors.is_empty(),
+        "Expected no errors: {:?}",
+        resp.errors
+    );
     let json_resp = serde_json::to_value(&resp.data).unwrap();
     assert_eq!(
         json_resp["directMessageReceived"]["id"].as_str().unwrap(),
         msg_for_alice.id.to_string()
     );
     assert_eq!(
-        json_resp["directMessageReceived"]["content"].as_str().unwrap(),
+        json_resp["directMessageReceived"]["content"]
+            .as_str()
+            .unwrap(),
         "Hello Alice!"
     );
 
@@ -216,7 +228,9 @@ async fn test_subscription_notification_security_authorization() {
     let test_file = format!("./data/test_sub_notif_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to connect SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to connect SQLite");
     let broker = MessageBroker::new(16);
     let schema = build_schema(db, AuthConfig::default(), broker.clone());
 
@@ -237,7 +251,9 @@ async fn test_subscription_notification_security_authorization() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "AUTH_TOKEN_REQUIRED"
     );
 
@@ -251,7 +267,9 @@ async fn test_subscription_notification_security_authorization() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "FORBIDDEN"
     );
 
@@ -279,7 +297,11 @@ async fn test_subscription_notification_security_authorization() {
     });
 
     let resp = stream.next().await.expect("Expected notification");
-    assert!(resp.errors.is_empty(), "Expected no errors: {:?}", resp.errors);
+    assert!(
+        resp.errors.is_empty(),
+        "Expected no errors: {:?}",
+        resp.errors
+    );
     let json_resp = serde_json::to_value(&resp.data).unwrap();
     assert_eq!(
         json_resp["notificationReceived"]["id"].as_str().unwrap(),
@@ -294,7 +316,9 @@ async fn test_subscription_typing_status_security() {
     let test_file = format!("./data/test_sub_typing_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to connect SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to connect SQLite");
     let broker = MessageBroker::new(16);
     let schema = build_schema(db, AuthConfig::default(), broker.clone());
 
@@ -315,7 +339,9 @@ async fn test_subscription_typing_status_security() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "AUTH_TOKEN_REQUIRED"
     );
 
@@ -326,7 +352,9 @@ async fn test_subscription_typing_status_security() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "BAD_REQUEST"
     );
 
@@ -340,7 +368,9 @@ async fn test_subscription_typing_status_security() {
     assert!(!resp.errors.is_empty());
     let json_resp = serde_json::to_value(&resp).unwrap();
     assert_eq!(
-        json_resp["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_resp["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "FORBIDDEN"
     );
 
@@ -352,7 +382,9 @@ async fn test_resolve_user_id_idor_prevention() {
     let test_file = format!("./data/test_idor_{}.db", Uuid::new_v4());
     let _ = std::fs::remove_file(&test_file);
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to connect SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to connect SQLite");
 
     // Register Alice & Bob in DB
     let alice = db
@@ -409,10 +441,15 @@ async fn test_resolve_user_id_idor_prevention() {
     );
     let req = Request::new(idor_mutation).data(auth_alice.clone());
     let res = schema.execute(req).await;
-    assert!(!res.errors.is_empty(), "Expected IDOR attempt to be rejected");
+    assert!(
+        !res.errors.is_empty(),
+        "Expected IDOR attempt to be rejected"
+    );
     let json_res = serde_json::to_value(&res).unwrap();
     assert_eq!(
-        json_res["errors"][0]["extensions"]["code"].as_str().unwrap(),
+        json_res["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
         "FORBIDDEN"
     );
 
@@ -433,7 +470,11 @@ async fn test_resolve_user_id_idor_prevention() {
     );
     let req = Request::new(legit_explicit_mutation).data(auth_alice.clone());
     let res = schema.execute(req).await;
-    assert!(res.errors.is_empty(), "Legitimate explicit ID should succeed: {:?}", res.errors);
+    assert!(
+        res.errors.is_empty(),
+        "Legitimate explicit ID should succeed: {:?}",
+        res.errors
+    );
 
     // 3. Alice creates a post without specifying authorId (Context resolution) -> Success
     let legit_implicit_mutation = r#"
@@ -448,7 +489,40 @@ async fn test_resolve_user_id_idor_prevention() {
     "#;
     let req = Request::new(legit_implicit_mutation).data(auth_alice.clone());
     let res = schema.execute(req).await;
-    assert!(res.errors.is_empty(), "Legitimate implicit ID should succeed: {:?}", res.errors);
+    assert!(
+        res.errors.is_empty(),
+        "Legitimate implicit ID should succeed: {:?}",
+        res.errors
+    );
+
+    // 4. Anonymous user attempts to create post specifying authorId: Bob -> Must fail with AUTH_TOKEN_REQUIRED
+    let anon_spoof_mutation = format!(
+        r#"
+        mutation {{
+            createPost(
+                content: "Unauthenticated spoofing attempt"
+                authorId: "{}"
+            ) {{
+                id
+            }}
+        }}
+        "#,
+        bob.id
+    );
+    let req = Request::new(anon_spoof_mutation); // No .data(AuthUser)
+    let res = schema.execute(req).await;
+    assert!(
+        !res.errors.is_empty(),
+        "Expected anonymous spoofing attempt to be rejected"
+    );
+    let json_res = serde_json::to_value(&res).unwrap();
+    assert_eq!(
+        json_res["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
+        "AUTH_TOKEN_REQUIRED",
+        "Anonymous spoofing must be rejected with AUTH_TOKEN_REQUIRED"
+    );
 
     let _ = std::fs::remove_file(&test_file);
 }

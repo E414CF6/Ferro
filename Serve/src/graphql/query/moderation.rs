@@ -1,9 +1,8 @@
+use crate::application::AppServices;
 use crate::application::helpers::require_auth;
 use crate::domain::models::ReportStatus;
-use crate::domain::repositories::ModerationRepository;
 use crate::graphql::types::{ReportGql, ReportStatusGql};
-use crate::infrastructure::db::postgres::Database;
-use async_graphql::{Context, Object, Result};
+use async_graphql::{Context, ErrorExtensions, Object, Result};
 
 #[derive(Default)]
 pub struct ModerationQuery;
@@ -18,9 +17,13 @@ impl ModerationQuery {
         limit: Option<usize>,
     ) -> Result<Vec<ReportGql>> {
         let _ = require_auth(ctx)?;
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let st_model = status.map(ReportStatus::from);
-        let list = db.get_reports(st_model, limit).await;
+        let list = services
+            .moderation
+            .get_reports(st_model, limit)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(list.into_iter().map(ReportGql).collect())
     }
 }

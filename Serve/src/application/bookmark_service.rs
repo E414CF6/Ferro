@@ -31,7 +31,7 @@ impl<R: BookmarkRepository> BookmarkService<R> {
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         self.repo
             .get_saved_posts_cursor(user_id, first, after)
             .await
@@ -98,11 +98,17 @@ impl<R: BookmarkRepository> BookmarkService<R> {
             .await
     }
 
-    pub async fn get_user_collections(&self, user_id: Uuid) -> Vec<BookmarkCollection> {
+    pub async fn get_user_collections(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<BookmarkCollection>, DomainError> {
         self.repo.get_user_collections(user_id).await
     }
 
-    pub async fn get_collection_by_id(&self, collection_id: Uuid) -> Option<BookmarkCollection> {
+    pub async fn get_collection_by_id(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Option<BookmarkCollection>, DomainError> {
         self.repo.get_collection_by_id(collection_id).await
     }
 
@@ -111,7 +117,7 @@ impl<R: BookmarkRepository> BookmarkService<R> {
         collection_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         self.repo
             .get_collection_posts_cursor(collection_id, first, after)
             .await

@@ -30,14 +30,12 @@ pub fn resolve_user_id(
         } else {
             Ok(auth_user.user_id)
         }
-    } else if let Some(id_str) = explicit_id {
-        Uuid::parse_str(&id_str).map_err(|_| {
-            DomainError::new(
-                ErrorCode::ErrorBadRequest,
-                ErrorCode::ErrorBadRequest.as_str(),
-            )
-            .extend()
-        })
+    } else if explicit_id.is_some() {
+        Err(DomainError::new(
+            ErrorCode::AuthTokenRequired,
+            ErrorCode::AuthTokenRequired.as_str(),
+        )
+        .extend())
     } else {
         Err(DomainError::new(
             ErrorCode::AuthUserIdOrTokenRequired,

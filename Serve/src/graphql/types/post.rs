@@ -3,22 +3,23 @@ use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::application::helpers::require_auth;
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::{
-    Post as PostModel, PostAnalytics as PostAnalyticsModel,
-    PostAudience as PostAudienceModel, PostMedia as PostMediaModel,
+    Post as PostModel, PostAnalytics as PostAnalyticsModel, PostAudience as PostAudienceModel,
+    PostMedia as PostMediaModel,
 };
 use crate::domain::repositories::*;
 use crate::infrastructure::auth::AuthUser;
 use crate::infrastructure::db::loaders::{
-    CommentLoader, PostLikesCountLoader, PostLoader, PostMediaLoader,
-    PostPollLoader, PostRepostsCountLoader, UserLoader,
+    CommentLoader, PostLikesCountLoader, PostLoader, PostMediaLoader, PostPollLoader,
+    PostRepostsCountLoader, UserLoader,
 };
 use crate::infrastructure::db::postgres::Database;
 
 use super::{
-    decode_cursor, encode_cursor, CommentConnectionGql, CommentEdgeGql, CommentGql,
-    MediaTypeGql, PageInfoGql, PollGql, UserGql,
+    CommentConnectionGql, CommentEdgeGql, CommentGql, MediaTypeGql, PageInfoGql, PollGql, UserGql,
+    decode_cursor, encode_cursor,
 };
 
 #[derive(Clone)]
@@ -124,7 +125,7 @@ impl PostGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let user = db.get_user_by_id(self.0.author_id).await.ok_or_else(|| {
+            let user = db.get_user_by_id(self.0.author_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::PostAuthorNotFound, "Post author not found").extend()
             })?;
             Ok(UserGql(user))
@@ -138,7 +139,7 @@ impl PostGql {
             Ok(media_list.into_iter().map(PostMediaGql).collect())
         } else {
             let db = ctx.data::<Database>()?;
-            let media_list = db.get_post_media(self.0.id).await;
+            let media_list = db.get_post_media(self.0.id).await?;
             Ok(media_list.into_iter().map(PostMediaGql).collect())
         }
     }
@@ -150,15 +151,17 @@ impl PostGql {
             Ok(poll_opt.map(PollGql))
         } else {
             let db = ctx.data::<Database>()?;
-            Ok(db.get_poll_by_post_id(self.0.id).await.map(PollGql))
+            Ok(db.get_poll_by_post_id(self.0.id).await?.map(PollGql))
         }
     }
 
-    /// Post Analytics & Insights
+    /// Post Analytics & Insights (strictly restricted to the post author)
     async fn analytics(&self, ctx: &Context<'_>) -> Result<PostAnalyticsGql> {
-        let db = ctx.data::<Database>()?;
-        let an = db
-            .get_post_analytics(self.0.id)
+        let auth_uid = require_auth(ctx)?;
+        let services = ctx.data::<crate::application::AppServices>()?;
+        let an = services
+            .post
+            .get_post_analytics(self.0.id, auth_uid)
             .await
             .map_err(|e| e.extend())?;
         Ok(PostAnalyticsGql(an))
@@ -174,7 +177,7 @@ impl PostGql {
             Ok(post_opt.map(PostGql))
         } else {
             let db = ctx.data::<Database>()?;
-            Ok(db.get_post_by_id(qid).await.map(PostGql))
+            Ok(db.get_post_by_id(qid).await?.map(PostGql))
         }
     }
 
@@ -188,7 +191,7 @@ impl PostGql {
             Ok(comment_opt.map(CommentGql))
         } else {
             let db = ctx.data::<Database>()?;
-            Ok(db.get_comment_by_id(cid).await.map(CommentGql))
+            Ok(db.get_comment_by_id(cid).await?.map(CommentGql))
         }
     }
 
@@ -270,9 +273,9 @@ impl PostGql {
     ) -> Result<Vec<CommentGql>> {
         let db = ctx.data::<Database>()?;
         let comments = if top_level_only.unwrap_or(false) {
-            db.get_top_level_comments_for_post(self.0.id).await
+            db.get_top_level_comments_for_post(self.0.id).await?
         } else {
-            db.get_comments_for_post(self.0.id).await
+            db.get_comments_for_post(self.0.id).await?
         };
         Ok(comments.into_iter().map(CommentGql).collect())
     }
@@ -296,7 +299,7 @@ impl PostGql {
         let is_top = top_level_only.unwrap_or(true);
         let (comments, has_next_page) = db
             .get_comments_cursor(self.0.id, is_top, page_size, cursor_pair)
-            .await;
+            .await?;
         let start_cursor = comments.first().map(|c| encode_cursor(c.created_at, c.id));
         let end_cursor = comments.last().map(|c| encode_cursor(c.created_at, c.id));
 

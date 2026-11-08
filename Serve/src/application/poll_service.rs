@@ -29,15 +29,15 @@ impl<R: PollRepository> PollService<R> {
             .await
     }
 
-    pub async fn get_poll_by_post_id(&self, post_id: Uuid) -> Option<Poll> {
+    pub async fn get_poll_by_post_id(&self, post_id: Uuid) -> Result<Option<Poll>, DomainError> {
         self.repo.get_poll_by_post_id(post_id).await
     }
 
-    pub async fn get_poll_by_id(&self, poll_id: Uuid) -> Option<Poll> {
+    pub async fn get_poll_by_id(&self, poll_id: Uuid) -> Result<Option<Poll>, DomainError> {
         self.repo.get_poll_by_id(poll_id).await
     }
 
-    pub async fn get_poll_options(&self, poll_id: Uuid) -> Vec<PollOption> {
+    pub async fn get_poll_options(&self, poll_id: Uuid) -> Result<Vec<PollOption>, DomainError> {
         self.repo.get_poll_options(poll_id).await
     }
 
@@ -58,7 +58,11 @@ impl<R: PollRepository> PollService<R> {
         self.repo.get_poll_total_votes(poll_id).await
     }
 
-    pub async fn get_user_vote_for_poll(&self, poll_id: Uuid, user_id: Uuid) -> Option<Uuid> {
+    pub async fn get_user_vote_for_poll(
+        &self,
+        poll_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Uuid>, DomainError> {
         self.repo.get_user_vote_for_poll(poll_id, user_id).await
     }
 }

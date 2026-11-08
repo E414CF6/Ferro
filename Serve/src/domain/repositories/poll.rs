@@ -13,9 +13,9 @@ pub trait PollRepository: Send + Sync {
         options: Vec<String>,
         duration_seconds: i64,
     ) -> Result<Poll, DomainError>;
-    async fn get_poll_by_post_id(&self, post_id: Uuid) -> Option<Poll>;
-    async fn get_poll_by_id(&self, poll_id: Uuid) -> Option<Poll>;
-    async fn get_poll_options(&self, poll_id: Uuid) -> Vec<PollOption>;
+    async fn get_poll_by_post_id(&self, post_id: Uuid) -> Result<Option<Poll>, DomainError>;
+    async fn get_poll_by_id(&self, poll_id: Uuid) -> Result<Option<Poll>, DomainError>;
+    async fn get_poll_options(&self, poll_id: Uuid) -> Result<Vec<PollOption>, DomainError>;
     async fn vote_poll(
         &self,
         poll_id: Uuid,
@@ -24,5 +24,9 @@ pub trait PollRepository: Send + Sync {
     ) -> Result<PollVote, DomainError>;
     async fn get_poll_option_votes_count(&self, option_id: Uuid) -> usize;
     async fn get_poll_total_votes(&self, poll_id: Uuid) -> usize;
-    async fn get_user_vote_for_poll(&self, poll_id: Uuid, user_id: Uuid) -> Option<Uuid>;
+    async fn get_user_vote_for_poll(
+        &self,
+        poll_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Uuid>, DomainError>;
 }

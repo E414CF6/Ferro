@@ -44,10 +44,10 @@ impl DmRepository for Database {
         user2_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<DirectMessage> {
+    ) -> Result<Vec<DirectMessage>, DomainError> {
         let limit = limit.unwrap_or(50) as i64;
         let offset = offset.unwrap_or(0) as i64;
-        db_fetch_all!(
+        let entities = db_fetch_all!(
             self,
             DirectMessageEntity,
             "SELECT * FROM direct_messages
@@ -58,10 +58,12 @@ impl DmRepository for Database {
             limit,
             offset
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(DirectMessage::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, "Failed to get direct messages");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get direct messages")
+        })?;
+
+        Ok(entities.into_iter().map(DirectMessage::from).collect())
     }
 
     async fn get_direct_messages_cursor(
@@ -70,7 +72,7 @@ impl DmRepository for Database {
         user2_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<DirectMessage>, bool) {
+    ) -> Result<(Vec<DirectMessage>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities = match after {
             Some((after_time, after_id)) => {
@@ -88,7 +90,6 @@ impl DmRepository for Database {
                     after_id,
                     fetch_limit
                 )
-                .unwrap_or_default()
             }
             None => {
                 db_fetch_all!(
@@ -102,9 +103,12 @@ impl DmRepository for Database {
                     user2_id,
                     fetch_limit
                 )
-                .unwrap_or_default()
             }
-        };
+        }
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, "Failed to get direct messages cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get direct messages cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<DirectMessage> = entities
@@ -113,10 +117,13 @@ impl DmRepository for Database {
             .map(DirectMessage::from)
             .collect();
 
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
-    async fn get_conversations(&self, user_id: Uuid) -> Vec<ConversationSummary> {
+    async fn get_conversations(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<ConversationSummary>, DomainError> {
         let sql = r#"
             WITH user_conversations AS (
                 SELECT partner_id, msg_id, sender_id, recipient_id, conversation_id, content, is_read, is_edited, created_at
@@ -149,84 +156,65 @@ impl DmRepository for Database {
             ORDER BY c.created_at DESC
         "#;
 
+        macro_rules! map_rows {
+            ($rows:expr) => {
+                $rows
+                    .into_iter()
+                    .map(|row| ConversationSummary {
+                        other_user: User {
+                            id: row.get("u_id"),
+                            username: row.get("u_username"),
+                            email: row.get("u_email"),
+                            password_hash: row.get("u_password_hash"),
+                            display_name: row.get("u_display_name"),
+                            bio: row.get("u_bio"),
+                            avatar_url: row.get("u_avatar_url"),
+                            header_image_url: row.get("u_header_image_url"),
+                            location: row.get("u_location"),
+                            website: row.get("u_website"),
+                            is_private: row.get("u_is_private"),
+                            is_2fa_enabled: false,
+                            totp_secret: None,
+                            created_at: row.get("u_created_at"),
+                        },
+                        last_message: DirectMessage {
+                            id: row.get("msg_id"),
+                            sender_id: row.get("sender_id"),
+                            recipient_id: row.get("recipient_id"),
+                            conversation_id: row.get("conversation_id"),
+                            content: row.get("content"),
+                            is_read: row.get("is_read"),
+                            is_edited: row.get("is_edited"),
+                            created_at: row.get("msg_created_at"),
+                        },
+                        unread_count: row.get("unread_count"),
+                    })
+                    .collect()
+            };
+        }
+
         match self.backend() {
             DatabaseBackend::Postgres(pool) => {
                 let rows = sqlx::query(sql)
                     .bind(user_id)
                     .fetch_all(pool)
                     .await
-                    .unwrap_or_default();
-
-                rows.into_iter()
-                    .map(|row| ConversationSummary {
-                        other_user: User {
-                            id: row.get("u_id"),
-                            username: row.get("u_username"),
-                            email: row.get("u_email"),
-                            password_hash: row.get("u_password_hash"),
-                            display_name: row.get("u_display_name"),
-                            bio: row.get("u_bio"),
-                            avatar_url: row.get("u_avatar_url"),
-                            header_image_url: row.get("u_header_image_url"),
-                            location: row.get("u_location"),
-                            website: row.get("u_website"),
-                            is_private: row.get("u_is_private"),
-                            is_2fa_enabled: false,
-                            totp_secret: None,
-                            created_at: row.get("u_created_at"),
-                        },
-                        last_message: DirectMessage {
-                            id: row.get("msg_id"),
-                            sender_id: row.get("sender_id"),
-                            recipient_id: row.get("recipient_id"),
-                            conversation_id: row.get("conversation_id"),
-                            content: row.get("content"),
-                            is_read: row.get("is_read"),
-                            is_edited: row.get("is_edited"),
-                            created_at: row.get("msg_created_at"),
-                        },
-                        unread_count: row.get("unread_count"),
-                    })
-                    .collect()
+                    .map_err(|e| {
+                        error!(target: "serve::dm_repo", error = %e, user_id = %user_id, "Failed to get conversations");
+                        DomainError::new(ErrorCode::ErrorInternal, "Failed to get conversations")
+                    })?;
+                Ok(map_rows!(rows))
             }
             DatabaseBackend::Sqlite(pool) => {
                 let rows = sqlx::query(sql)
                     .bind(user_id)
                     .fetch_all(pool)
                     .await
-                    .unwrap_or_default();
-
-                rows.into_iter()
-                    .map(|row| ConversationSummary {
-                        other_user: User {
-                            id: row.get("u_id"),
-                            username: row.get("u_username"),
-                            email: row.get("u_email"),
-                            password_hash: row.get("u_password_hash"),
-                            display_name: row.get("u_display_name"),
-                            bio: row.get("u_bio"),
-                            avatar_url: row.get("u_avatar_url"),
-                            header_image_url: row.get("u_header_image_url"),
-                            location: row.get("u_location"),
-                            website: row.get("u_website"),
-                            is_private: row.get("u_is_private"),
-                            is_2fa_enabled: false,
-                            totp_secret: None,
-                            created_at: row.get("u_created_at"),
-                        },
-                        last_message: DirectMessage {
-                            id: row.get("msg_id"),
-                            sender_id: row.get("sender_id"),
-                            recipient_id: row.get("recipient_id"),
-                            conversation_id: row.get("conversation_id"),
-                            content: row.get("content"),
-                            is_read: row.get("is_read"),
-                            is_edited: row.get("is_edited"),
-                            created_at: row.get("msg_created_at"),
-                        },
-                        unread_count: row.get("unread_count"),
-                    })
-                    .collect()
+                    .map_err(|e| {
+                        error!(target: "serve::dm_repo", error = %e, user_id = %user_id, "Failed to get conversations");
+                        DomainError::new(ErrorCode::ErrorInternal, "Failed to get conversations")
+                    })?;
+                Ok(map_rows!(rows))
             }
         }
     }
@@ -311,20 +299,29 @@ impl DmRepository for Database {
         Ok(convo)
     }
 
-    async fn get_conversation_by_id(&self, conversation_id: Uuid) -> Option<Conversation> {
-        db_fetch_optional!(
+    async fn get_conversation_by_id(
+        &self,
+        conversation_id: Uuid,
+    ) -> Result<Option<Conversation>, DomainError> {
+        let entity = db_fetch_optional!(
             self,
             ConversationEntity,
             "SELECT * FROM conversations WHERE id = $1",
             conversation_id
         )
-        .ok()
-        .flatten()
-        .map(Conversation::from)
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, conversation_id = %conversation_id, "Failed to get conversation by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get conversation")
+        })?;
+
+        Ok(entity.map(Conversation::from))
     }
 
-    async fn get_conversation_participants(&self, conversation_id: Uuid) -> Vec<User> {
-        db_fetch_all!(
+    async fn get_conversation_participants(
+        &self,
+        conversation_id: Uuid,
+    ) -> Result<Vec<User>, DomainError> {
+        let entities = db_fetch_all!(
             self,
             UserEntity,
             "SELECT u.* FROM users u
@@ -333,10 +330,12 @@ impl DmRepository for Database {
              ORDER BY cp.joined_at ASC",
             conversation_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(User::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, conversation_id = %conversation_id, "Failed to get conversation participants");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get conversation participants")
+        })?;
+
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
     async fn send_conversation_message(
@@ -379,10 +378,10 @@ impl DmRepository for Database {
         conversation_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<DirectMessage> {
+    ) -> Result<Vec<DirectMessage>, DomainError> {
         let limit = limit.unwrap_or(50) as i64;
         let offset = offset.unwrap_or(0) as i64;
-        db_fetch_all!(
+        let entities = db_fetch_all!(
             self,
             DirectMessageEntity,
             "SELECT * FROM direct_messages WHERE conversation_id = $1 ORDER BY created_at ASC, id ASC LIMIT $2 OFFSET $3",
@@ -390,10 +389,12 @@ impl DmRepository for Database {
             limit,
             offset
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(DirectMessage::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, conversation_id = %conversation_id, "Failed to get conversation messages");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get conversation messages")
+        })?;
+
+        Ok(entities.into_iter().map(DirectMessage::from).collect())
     }
 
     async fn get_conversation_messages_cursor(
@@ -401,7 +402,7 @@ impl DmRepository for Database {
         conversation_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<DirectMessage>, bool) {
+    ) -> Result<(Vec<DirectMessage>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -416,8 +417,7 @@ impl DmRepository for Database {
                 after_time,
                 after_id,
                 fetch_limit
-            )
-            .unwrap_or_default(),
+            ),
             None => db_fetch_all!(
                 self,
                 DirectMessageEntity,
@@ -427,9 +427,12 @@ impl DmRepository for Database {
                      LIMIT $2",
                 conversation_id,
                 fetch_limit
-            )
-            .unwrap_or_default(),
-        };
+            ),
+        }
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, conversation_id = %conversation_id, "Failed to get conversation messages cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get conversation messages cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<DirectMessage> = entities
@@ -438,7 +441,7 @@ impl DmRepository for Database {
             .map(DirectMessage::from)
             .collect();
 
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     async fn edit_direct_message(
@@ -492,8 +495,11 @@ impl DmRepository for Database {
         }
     }
 
-    async fn get_user_group_conversations(&self, user_id: Uuid) -> Vec<Conversation> {
-        db_fetch_all!(
+    async fn get_user_group_conversations(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<Conversation>, DomainError> {
+        let entities = db_fetch_all!(
             self,
             ConversationEntity,
             "SELECT c.* FROM conversations c
@@ -502,9 +508,11 @@ impl DmRepository for Database {
              ORDER BY c.updated_at DESC",
             user_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(Conversation::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::dm_repo", error = %e, user_id = %user_id, "Failed to get user group conversations");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user group conversations")
+        })?;
+
+        Ok(entities.into_iter().map(Conversation::from).collect())
     }
 }

@@ -1,9 +1,8 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::NotificationType;
-use crate::domain::repositories::{NotificationRepository, PostRepository, UserRepository};
 use crate::graphql::types::{UserGql, UserListGql};
-use crate::infrastructure::db::postgres::Database;
 use crate::infrastructure::pubsub::MessageBroker;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
@@ -22,8 +21,12 @@ impl SocialMutation {
     ) -> Result<bool> {
         let bid = resolve_user_id(ctx, blocker_id)?;
         let target_id = Uuid::parse_str(&user_id)?;
-        let db = ctx.data::<Database>()?;
-        db.block_user(bid, target_id).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .block_user(bid, target_id)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Unblock a user
@@ -35,8 +38,10 @@ impl SocialMutation {
     ) -> Result<bool> {
         let bid = resolve_user_id(ctx, blocker_id)?;
         let target_id = Uuid::parse_str(&user_id)?;
-        let db = ctx.data::<Database>()?;
-        db.unblock_user(bid, target_id)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .unblock_user(bid, target_id)
             .await
             .map_err(|e| e.extend())
     }
@@ -50,8 +55,12 @@ impl SocialMutation {
     ) -> Result<bool> {
         let mid = resolve_user_id(ctx, muter_id)?;
         let target_id = Uuid::parse_str(&user_id)?;
-        let db = ctx.data::<Database>()?;
-        db.mute_user(mid, target_id).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .mute_user(mid, target_id)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Unmute a user
@@ -63,8 +72,12 @@ impl SocialMutation {
     ) -> Result<bool> {
         let mid = resolve_user_id(ctx, muter_id)?;
         let target_id = Uuid::parse_str(&user_id)?;
-        let db = ctx.data::<Database>()?;
-        db.unmute_user(mid, target_id).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .unmute_user(mid, target_id)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Accept a pending follow request
@@ -76,15 +89,17 @@ impl SocialMutation {
     ) -> Result<UserGql> {
         let tid = resolve_user_id(ctx, target_id)?;
         let rid = Uuid::parse_str(&requester_id)?;
-        let db = ctx.data::<Database>()?;
-        let user = db
+        let services = ctx.data::<AppServices>()?;
+        let user = services
+            .social
             .accept_follow_request(tid, rid)
             .await
             .map_err(|e| e.extend())?;
 
         // Send follow accepted notification
         if let Ok(broker) = ctx.data::<MessageBroker>() {
-            if let Ok(notif) = db
+            if let Ok(notif) = services
+                .notification
                 .create_notification(rid, tid, NotificationType::FollowAccepted, None)
                 .await
             {
@@ -104,8 +119,10 @@ impl SocialMutation {
     ) -> Result<bool> {
         let tid = resolve_user_id(ctx, target_id)?;
         let rid = Uuid::parse_str(&requester_id)?;
-        let db = ctx.data::<Database>()?;
-        db.reject_follow_request(tid, rid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .reject_follow_request(tid, rid)
             .await
             .map_err(|e| e.extend())
     }
@@ -128,19 +145,25 @@ impl SocialMutation {
             .extend());
         }
 
-        let db = ctx.data::<Database>()?;
-        let target_user = db.get_user_by_id(fe_id).await.ok_or_else(|| {
-            DomainError::new(ErrorCode::UserNotFound, "Target user not found").extend()
-        })?;
+        let services = ctx.data::<AppServices>()?;
+        let target_user = services
+            .social
+            .get_user_by_id(fe_id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::new(ErrorCode::UserNotFound, "Target user not found").extend()
+            })?;
 
         if target_user.is_private {
             // Create follow request for private account
-            let _ = db
+            let _ = services
+                .social
                 .create_follow_request(fr_id, fe_id)
                 .await
                 .map_err(|e| e.extend())?;
             if let Ok(broker) = ctx.data::<MessageBroker>() {
-                if let Ok(notif) = db
+                if let Ok(notif) = services
+                    .notification
                     .create_notification(fe_id, fr_id, NotificationType::FollowRequest, None)
                     .await
                 {
@@ -150,12 +173,17 @@ impl SocialMutation {
             Ok(UserGql(target_user))
         } else {
             // Direct follow for public account
-            let followee = db.follow_user(fr_id, fe_id).await.map_err(|e| e.extend())?;
-            if let Ok(notif) = db
-                .create_notification(fe_id, fr_id, NotificationType::Follow, None)
+            let followee = services
+                .social
+                .follow_user(fr_id, fe_id)
                 .await
-            {
-                if let Ok(broker) = ctx.data::<MessageBroker>() {
+                .map_err(|e| e.extend())?;
+            if let Ok(broker) = ctx.data::<MessageBroker>() {
+                if let Ok(notif) = services
+                    .notification
+                    .create_notification(fe_id, fr_id, NotificationType::Follow, None)
+                    .await
+                {
                     broker.publish_notification(notif);
                 }
             }
@@ -172,8 +200,9 @@ impl SocialMutation {
     ) -> Result<UserGql> {
         let fr_id = resolve_user_id(ctx, follower_id)?;
         let fe_id = Uuid::parse_str(&followee_id)?;
-        let db = ctx.data::<Database>()?;
-        let followee = db
+        let services = ctx.data::<AppServices>()?;
+        let followee = services
+            .social
             .unfollow_user(fr_id, fe_id)
             .await
             .map_err(|e| e.extend())?;
@@ -198,8 +227,9 @@ impl SocialMutation {
             }
         }
 
-        let db = ctx.data::<Database>()?;
-        let list = db
+        let services = ctx.data::<AppServices>()?;
+        let list = services
+            .social
             .create_user_list(oid, name, description, is_private.unwrap_or(false), members)
             .await
             .map_err(|e| e.extend())?;
@@ -218,8 +248,9 @@ impl SocialMutation {
     ) -> Result<UserListGql> {
         let oid = resolve_user_id(ctx, owner_id)?;
         let lid = Uuid::parse_str(&list_id)?;
-        let db = ctx.data::<Database>()?;
-        let list = db
+        let services = ctx.data::<AppServices>()?;
+        let list = services
+            .social
             .update_user_list(lid, oid, name, description, is_private)
             .await
             .map_err(|e| e.extend())?;
@@ -235,8 +266,12 @@ impl SocialMutation {
     ) -> Result<bool> {
         let oid = resolve_user_id(ctx, owner_id)?;
         let lid = Uuid::parse_str(&list_id)?;
-        let db = ctx.data::<Database>()?;
-        db.delete_user_list(lid, oid).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .delete_user_list(lid, oid)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Add a user to a list
@@ -250,8 +285,10 @@ impl SocialMutation {
         let oid = resolve_user_id(ctx, owner_id)?;
         let lid = Uuid::parse_str(&list_id)?;
         let uid = Uuid::parse_str(&user_id)?;
-        let db = ctx.data::<Database>()?;
-        db.add_user_to_list(lid, oid, uid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .add_user_to_list(lid, oid, uid)
             .await
             .map_err(|e| e.extend())
     }
@@ -267,8 +304,10 @@ impl SocialMutation {
         let oid = resolve_user_id(ctx, owner_id)?;
         let lid = Uuid::parse_str(&list_id)?;
         let uid = Uuid::parse_str(&user_id)?;
-        let db = ctx.data::<Database>()?;
-        db.remove_user_from_list(lid, oid, uid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .social
+            .remove_user_from_list(lid, oid, uid)
             .await
             .map_err(|e| e.extend())
     }

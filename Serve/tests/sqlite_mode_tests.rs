@@ -60,6 +60,7 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
     let fetched_user = db
         .get_user_by_username("alice_sqlite_unique")
         .await
+        .expect("Query failed")
         .expect("User should be found by username");
     assert_eq!(fetched_user.id, user1.id);
     assert_eq!(fetched_user.display_name, "Alice in SQLiteland");
@@ -104,7 +105,10 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
         .await
         .expect("Bob saves post");
     assert!(db.is_post_saved_by(post.id, user2.id).await);
-    let saved_posts = db.get_saved_posts(user2.id, None, None).await;
+    let saved_posts = db
+        .get_saved_posts(user2.id, None, None)
+        .await
+        .expect("get_saved_posts");
     assert_eq!(saved_posts.len(), 1);
     assert_eq!(saved_posts[0].id, post.id);
 
@@ -130,7 +134,10 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
         .expect("Alice replies to Bob");
 
     assert_eq!(db.get_replies_count(comment.id).await, 1);
-    let replies = db.get_replies_for_comment(comment.id).await;
+    let replies = db
+        .get_replies_for_comment(comment.id)
+        .await
+        .expect("get_replies");
     assert_eq!(replies.len(), 1);
     assert_eq!(replies[0].id, reply.id);
 
@@ -180,7 +187,10 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
         .await
         .expect("Create poll");
 
-    let options = db.get_poll_options(poll.id).await;
+    let options = db
+        .get_poll_options(poll.id)
+        .await
+        .expect("get_poll_options");
     assert_eq!(options.len(), 2);
 
     let vote = db
@@ -205,7 +215,10 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
         .await
         .expect("Add post to collection");
 
-    let cols = db.get_user_collections(user1.id).await;
+    let cols = db
+        .get_user_collections(user1.id)
+        .await
+        .expect("get_user_collections");
     assert_eq!(cols.len(), 1);
 
     // 10. Persistence Check: Drop db connection and reload from the same SQLite file
@@ -218,12 +231,14 @@ async fn test_sqlite_database_mode_crud_and_persistence() {
     let reloaded_user1 = reloaded_db
         .get_user_by_username("alice_sqlite_unique")
         .await
+        .expect("Query failed")
         .expect("User should persist in SQLite file");
     assert_eq!(reloaded_user1.id, user1.id);
 
     let reloaded_post = reloaded_db
         .get_post_by_id(post.id)
         .await
+        .expect("Query failed")
         .expect("Post should persist in SQLite file");
     assert_eq!(reloaded_post.content, post.content);
 
@@ -359,7 +374,9 @@ async fn test_social_relations_dataloader_batching() {
     let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to initialize SQLite");
 
     let alice = db
         .register_user(
@@ -414,7 +431,9 @@ async fn test_social_relations_dataloader_batching() {
     // Alice mutes Charlie
     db.mute_user(alice.id, charlie.id).await.unwrap();
     // Charlie sends follow request to Alice
-    db.create_follow_request(charlie.id, alice.id).await.unwrap();
+    db.create_follow_request(charlie.id, alice.id)
+        .await
+        .unwrap();
 
     let broker = MessageBroker::new(16);
     let schema = build_schema(db, AuthConfig::default(), broker);
@@ -440,18 +459,28 @@ async fn test_social_relations_dataloader_batching() {
     "#;
     let req = Request::new(query_alice).data(auth_alice.clone());
     let res = schema.execute(req).await;
-    assert!(res.errors.is_empty(), "Alice query failed: {:?}", res.errors);
+    assert!(
+        res.errors.is_empty(),
+        "Alice query failed: {:?}",
+        res.errors
+    );
 
     let users_json = serde_json::to_value(&res.data).unwrap();
     let users = users_json["users"].as_array().unwrap();
 
-    let bob_res = users.iter().find(|u| u["username"] == "bob_social").unwrap();
+    let bob_res = users
+        .iter()
+        .find(|u| u["username"] == "bob_social")
+        .unwrap();
     assert_eq!(bob_res["isFollowedByMe"], true);
     assert_eq!(bob_res["isBlockingMe"], false);
     assert_eq!(bob_res["isBlockedByMe"], false);
     assert_eq!(bob_res["isMutedByMe"], false);
 
-    let charlie_res = users.iter().find(|u| u["username"] == "charlie_social").unwrap();
+    let charlie_res = users
+        .iter()
+        .find(|u| u["username"] == "charlie_social")
+        .unwrap();
     assert_eq!(charlie_res["isFollowedByMe"], false);
     assert_eq!(charlie_res["isMutedByMe"], true);
     assert_eq!(charlie_res["hasPendingFollowRequest"], false);
@@ -463,15 +492,25 @@ async fn test_social_relations_dataloader_batching() {
     };
     let req_charlie = Request::new(query_alice).data(auth_charlie);
     let res_charlie = schema.execute(req_charlie).await;
-    assert!(res_charlie.errors.is_empty(), "Charlie query failed: {:?}", res_charlie.errors);
+    assert!(
+        res_charlie.errors.is_empty(),
+        "Charlie query failed: {:?}",
+        res_charlie.errors
+    );
 
     let charlie_view = serde_json::to_value(&res_charlie.data).unwrap();
     let charlie_users = charlie_view["users"].as_array().unwrap();
 
-    let alice_view = charlie_users.iter().find(|u| u["username"] == "alice_social").unwrap();
+    let alice_view = charlie_users
+        .iter()
+        .find(|u| u["username"] == "alice_social")
+        .unwrap();
     assert_eq!(alice_view["hasPendingFollowRequest"], true);
 
-    let bob_view = charlie_users.iter().find(|u| u["username"] == "bob_social").unwrap();
+    let bob_view = charlie_users
+        .iter()
+        .find(|u| u["username"] == "bob_social")
+        .unwrap();
     assert_eq!(bob_view["isBlockingMe"], true);
 
     // 4. Anonymous query returns false for all relation fields
@@ -499,7 +538,9 @@ async fn test_post_creation_transaction_atomicity() {
     let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to initialize SQLite");
 
     let author = db
         .register_user(
@@ -546,11 +587,20 @@ async fn test_post_creation_transaction_atomicity() {
         .expect("Post creation with details should succeed");
 
     // Verify all parts exist: post, media, poll
-    let post_in_db = db.get_post_by_id(created_post.id).await;
+    let post_in_db = db
+        .get_post_by_id(created_post.id)
+        .await
+        .expect("get_post_by_id");
     assert!(post_in_db.is_some());
-    let media_in_db = db.get_post_media(created_post.id).await;
+    let media_in_db = db
+        .get_post_media(created_post.id)
+        .await
+        .expect("get_post_media");
     assert_eq!(media_in_db.len(), 1);
-    let poll_in_db = db.get_poll_by_post_id(created_post.id).await;
+    let poll_in_db = db
+        .get_poll_by_post_id(created_post.id)
+        .await
+        .expect("get_poll_by_post_id");
     assert!(poll_in_db.is_some());
 
     // 2. Rollback case: pass duplicate media IDs in media list (PK conflict on post_media)
@@ -576,7 +626,7 @@ async fn test_post_creation_transaction_atomicity() {
     );
 
     // Verify rollback: search for content of failed post
-    let search_results = db.search_posts("rolled back").await;
+    let search_results = db.search_posts("rolled back").await.expect("search_posts");
     assert!(
         search_results.is_empty(),
         "Post should have been rolled back completely!"

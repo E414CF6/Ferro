@@ -1,8 +1,7 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
 use crate::domain::models::NotificationType;
-use crate::domain::repositories::{CommentRepository, NotificationRepository, PostRepository};
 use crate::graphql::types::{CommentGql, PostGql};
-use crate::infrastructure::db::postgres::Database;
 use crate::infrastructure::pubsub::MessageBroker;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
@@ -31,8 +30,9 @@ impl CommentMutation {
             None
         };
 
-        let db = ctx.data::<Database>()?;
-        let comment = db
+        let services = ctx.data::<AppServices>()?;
+        let comment = services
+            .comment
             .create_comment(pid, aid, valid_content, parent_uuid)
             .await
             .map_err(|e| e.extend())?;
@@ -40,9 +40,12 @@ impl CommentMutation {
         // Automatic real-time notification delivery
         if let Ok(broker) = ctx.data::<MessageBroker>() {
             if let Some(parent_uid) = parent_uuid {
-                if let Some(parent_comment) = db.get_comment_by_id(parent_uid).await {
+                if let Ok(Some(parent_comment)) =
+                    services.comment.get_comment_by_id(parent_uid).await
+                {
                     if parent_comment.author_id != aid {
-                        if let Ok(notif) = db
+                        if let Ok(notif) = services
+                            .notification
                             .create_notification(
                                 parent_comment.author_id,
                                 aid,
@@ -55,9 +58,10 @@ impl CommentMutation {
                         }
                     }
                 }
-            } else if let Some(post) = db.get_post_by_id(pid).await {
+            } else if let Ok(Some(post)) = services.post.get_post_by_id(pid).await {
                 if post.author_id != aid {
-                    if let Ok(notif) = db
+                    if let Ok(notif) = services
+                        .notification
                         .create_notification(
                             post.author_id,
                             aid,
@@ -84,12 +88,17 @@ impl CommentMutation {
     ) -> Result<CommentGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let cid = Uuid::parse_str(&comment_id)?;
-        let db = ctx.data::<Database>()?;
-        let comment = db.like_comment(uid, cid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let comment = services
+            .comment
+            .like_comment(uid, cid)
+            .await
+            .map_err(|e| e.extend())?;
 
         // Send notification if not liking own comment
         if comment.author_id != uid {
-            if let Ok(notif) = db
+            if let Ok(notif) = services
+                .notification
                 .create_notification(
                     comment.author_id,
                     uid,
@@ -116,8 +125,12 @@ impl CommentMutation {
     ) -> Result<CommentGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let cid = Uuid::parse_str(&comment_id)?;
-        let db = ctx.data::<Database>()?;
-        let comment = db.unlike_comment(uid, cid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let comment = services
+            .comment
+            .unlike_comment(uid, cid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(CommentGql(comment))
     }
 
@@ -133,8 +146,9 @@ impl CommentMutation {
         let cid = Uuid::parse_str(&comment_id)?;
         let valid_content = crate::domain::validation::validate_comment_content(&content)
             .map_err(|e| e.extend())?;
-        let db = ctx.data::<Database>()?;
-        let comment = db
+        let services = ctx.data::<AppServices>()?;
+        let comment = services
+            .comment
             .edit_comment(cid, aid, valid_content)
             .await
             .map_err(|e| e.extend())?;
@@ -152,8 +166,9 @@ impl CommentMutation {
         let aid = resolve_user_id(ctx, author_id)?;
         let pid = Uuid::parse_str(&post_id)?;
         let cid = Uuid::parse_str(&comment_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .comment
             .pin_comment(pid, cid, aid)
             .await
             .map_err(|e| e.extend())?;
@@ -169,8 +184,12 @@ impl CommentMutation {
     ) -> Result<PostGql> {
         let aid = resolve_user_id(ctx, author_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.unpin_comment(pid, aid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .comment
+            .unpin_comment(pid, aid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(PostGql(post))
     }
 
@@ -183,7 +202,11 @@ impl CommentMutation {
     ) -> Result<bool> {
         let aid = resolve_user_id(ctx, author_id)?;
         let cid = Uuid::parse_str(&comment_id)?;
-        let db = ctx.data::<Database>()?;
-        db.delete_comment(cid, aid).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .comment
+            .delete_comment(cid, aid)
+            .await
+            .map_err(|e| e.extend())
     }
 }

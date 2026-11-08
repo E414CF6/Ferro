@@ -6,8 +6,8 @@ use serve::application::{
 };
 use serve::domain::errors::{DomainError, ErrorCode};
 use serve::domain::models::{
-    ArticleFilterParams, Comment, FollowRequest, Post, PostAnalytics, PostAudience,
-    PostMedia, User, UserList, WikiArticle, WikiRevision,
+    ArticleFilterParams, Comment, FollowRequest, Post, PostAnalytics, PostAudience, PostMedia,
+    User, UserList, WikiArticle, WikiRevision,
 };
 use serve::domain::repositories::{
     CommentRepository, PostRepository, UserRepository, WikiRepository,
@@ -70,8 +70,8 @@ impl CommentRepository for MockCommentRepo {
         Ok(true)
     }
 
-    async fn get_comment_by_id(&self, comment_id: Uuid) -> Option<Comment> {
-        Some(Comment {
+    async fn get_comment_by_id(&self, comment_id: Uuid) -> Result<Option<Comment>, DomainError> {
+        Ok(Some(Comment {
             id: comment_id,
             post_id: Uuid::new_v4(),
             author_id: Uuid::new_v4(),
@@ -80,15 +80,18 @@ impl CommentRepository for MockCommentRepo {
             is_edited: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
-        })
+        }))
     }
 
-    async fn get_comments_for_post(&self, _post_id: Uuid) -> Vec<Comment> {
-        vec![]
+    async fn get_comments_for_post(&self, _post_id: Uuid) -> Result<Vec<Comment>, DomainError> {
+        Ok(vec![])
     }
 
-    async fn get_top_level_comments_for_post(&self, _post_id: Uuid) -> Vec<Comment> {
-        vec![]
+    async fn get_top_level_comments_for_post(
+        &self,
+        _post_id: Uuid,
+    ) -> Result<Vec<Comment>, DomainError> {
+        Ok(vec![])
     }
 
     async fn get_comments_cursor(
@@ -97,12 +100,15 @@ impl CommentRepository for MockCommentRepo {
         _top_level_only: bool,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Comment>, bool) {
-        (vec![], false)
+    ) -> Result<(Vec<Comment>, bool), DomainError> {
+        Ok((vec![], false))
     }
 
-    async fn get_replies_for_comment(&self, _comment_id: Uuid) -> Vec<Comment> {
-        vec![]
+    async fn get_replies_for_comment(
+        &self,
+        _comment_id: Uuid,
+    ) -> Result<Vec<Comment>, DomainError> {
+        Ok(vec![])
     }
 
     async fn get_replies_cursor(
@@ -110,8 +116,8 @@ impl CommentRepository for MockCommentRepo {
         _comment_id: Uuid,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Comment>, bool) {
-        (vec![], false)
+    ) -> Result<(Vec<Comment>, bool), DomainError> {
+        Ok((vec![], false))
     }
 
     async fn get_replies_count(&self, _comment_id: Uuid) -> usize {
@@ -121,7 +127,7 @@ impl CommentRepository for MockCommentRepo {
     async fn like_comment(&self, _user_id: Uuid, comment_id: Uuid) -> Result<Comment, DomainError> {
         let comment = self
             .get_comment_by_id(comment_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
         Ok(comment)
     }
@@ -133,7 +139,7 @@ impl CommentRepository for MockCommentRepo {
     ) -> Result<Comment, DomainError> {
         let comment = self
             .get_comment_by_id(comment_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
         Ok(comment)
     }
@@ -159,8 +165,8 @@ impl CommentRepository for MockCommentRepo {
         unimplemented!()
     }
 
-    async fn get_pinned_comment(&self, _post_id: Uuid) -> Option<Comment> {
-        None
+    async fn get_pinned_comment(&self, _post_id: Uuid) -> Result<Option<Comment>, DomainError> {
+        Ok(None)
     }
 }
 
@@ -226,34 +232,42 @@ impl PostRepository for MockPostRepo {
         lock.iter().filter(|p| p.author_id == user_id).count()
     }
 
-    async fn get_liked_posts_by_user(&self, _user_id: Uuid) -> Vec<Post> {
-        vec![]
+    async fn get_liked_posts_by_user(&self, _user_id: Uuid) -> Result<Vec<Post>, DomainError> {
+        Ok(vec![])
     }
 
-    async fn get_comments_by_user(&self, _user_id: Uuid) -> Vec<Comment> {
-        vec![]
+    async fn get_comments_by_user(&self, _user_id: Uuid) -> Result<Vec<Comment>, DomainError> {
+        Ok(vec![])
     }
 
-    async fn get_posts(&self, _limit: Option<usize>, _offset: Option<usize>) -> Vec<Post> {
-        self.posts.lock().await.clone()
+    async fn get_posts(
+        &self,
+        _limit: Option<usize>,
+        _offset: Option<usize>,
+    ) -> Result<Vec<Post>, DomainError> {
+        Ok(self.posts.lock().await.clone())
     }
 
     async fn get_posts_cursor(
         &self,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
-        (self.posts.lock().await.clone(), false)
+    ) -> Result<(Vec<Post>, bool), DomainError> {
+        Ok((self.posts.lock().await.clone(), false))
     }
 
-    async fn get_post_by_id(&self, id: Uuid) -> Option<Post> {
+    async fn get_post_by_id(&self, id: Uuid) -> Result<Option<Post>, DomainError> {
         let lock = self.posts.lock().await;
-        lock.iter().find(|p| p.id == id).cloned()
+        Ok(lock.iter().find(|p| p.id == id).cloned())
     }
 
-    async fn get_posts_by_author(&self, author_id: Uuid) -> Vec<Post> {
+    async fn get_posts_by_author(&self, author_id: Uuid) -> Result<Vec<Post>, DomainError> {
         let lock = self.posts.lock().await;
-        lock.iter().filter(|p| p.author_id == author_id).cloned().collect()
+        Ok(lock
+            .iter()
+            .filter(|p| p.author_id == author_id)
+            .cloned()
+            .collect())
     }
 
     async fn create_post(
@@ -314,9 +328,10 @@ impl PostRepository for MockPostRepo {
         content: String,
     ) -> Result<Post, DomainError> {
         let mut lock = self.posts.lock().await;
-        let post = lock.iter_mut().find(|p| p.id == post_id).ok_or_else(|| {
-            DomainError::new(ErrorCode::PostNotFound, "Post not found")
-        })?;
+        let post = lock
+            .iter_mut()
+            .find(|p| p.id == post_id)
+            .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         if post.author_id != author_id {
             return Err(DomainError::new(
@@ -350,8 +365,8 @@ impl PostRepository for MockPostRepo {
         _user_id: Uuid,
         _limit: Option<usize>,
         _offset: Option<usize>,
-    ) -> Vec<Post> {
-        self.posts.lock().await.clone()
+    ) -> Result<Vec<Post>, DomainError> {
+        Ok(self.posts.lock().await.clone())
     }
 
     async fn get_feed_cursor(
@@ -359,13 +374,17 @@ impl PostRepository for MockPostRepo {
         _user_id: Uuid,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
-        (self.posts.lock().await.clone(), false)
+    ) -> Result<(Vec<Post>, bool), DomainError> {
+        Ok((self.posts.lock().await.clone(), false))
     }
 
-    async fn search_posts(&self, query: &str) -> Vec<Post> {
+    async fn search_posts(&self, query: &str) -> Result<Vec<Post>, DomainError> {
         let lock = self.posts.lock().await;
-        lock.iter().filter(|p| p.content.contains(query)).cloned().collect()
+        Ok(lock
+            .iter()
+            .filter(|p| p.content.contains(query))
+            .cloned()
+            .collect())
     }
 
     async fn search_posts_cursor(
@@ -373,8 +392,8 @@ impl PostRepository for MockPostRepo {
         _query: &str,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
-        (vec![], false)
+    ) -> Result<(Vec<Post>, bool), DomainError> {
+        Ok((vec![], false))
     }
 
     async fn get_posts_by_hashtag_cursor(
@@ -382,12 +401,15 @@ impl PostRepository for MockPostRepo {
         _hashtag: &str,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
-        (vec![], false)
+    ) -> Result<(Vec<Post>, bool), DomainError> {
+        Ok((vec![], false))
     }
 
-    async fn get_trending_hashtags(&self, _limit: Option<usize>) -> Vec<(String, usize)> {
-        vec![]
+    async fn get_trending_hashtags(
+        &self,
+        _limit: Option<usize>,
+    ) -> Result<Vec<(String, usize)>, DomainError> {
+        Ok(vec![])
     }
 
     async fn like_post(&self, _user_id: Uuid, _post_id: Uuid) -> Result<Post, DomainError> {
@@ -430,8 +452,8 @@ impl PostRepository for MockPostRepo {
         Ok(vec![])
     }
 
-    async fn get_post_media(&self, _post_id: Uuid) -> Vec<PostMedia> {
-        vec![]
+    async fn get_post_media(&self, _post_id: Uuid) -> Result<Vec<PostMedia>, DomainError> {
+        Ok(vec![])
     }
 
     async fn create_user_list(
@@ -478,16 +500,16 @@ impl PostRepository for MockPostRepo {
         Ok(true)
     }
 
-    async fn get_user_lists(&self, _user_id: Uuid) -> Vec<UserList> {
-        vec![]
+    async fn get_user_lists(&self, _user_id: Uuid) -> Result<Vec<UserList>, DomainError> {
+        Ok(vec![])
     }
 
-    async fn get_user_list_by_id(&self, _list_id: Uuid) -> Option<UserList> {
-        None
+    async fn get_user_list_by_id(&self, _list_id: Uuid) -> Result<Option<UserList>, DomainError> {
+        Ok(None)
     }
 
-    async fn get_list_members(&self, _list_id: Uuid) -> Vec<User> {
-        vec![]
+    async fn get_list_members(&self, _list_id: Uuid) -> Result<Vec<User>, DomainError> {
+        Ok(vec![])
     }
 
     async fn get_list_feed_cursor(
@@ -495,11 +517,15 @@ impl PostRepository for MockPostRepo {
         _list_id: Uuid,
         _first: usize,
         _after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
-        (vec![], false)
+    ) -> Result<(Vec<Post>, bool), DomainError> {
+        Ok((vec![], false))
     }
 
-    async fn record_post_view(&self, _post_id: Uuid, _viewer_id: Uuid) -> Result<bool, DomainError> {
+    async fn record_post_view(
+        &self,
+        _post_id: Uuid,
+        _viewer_id: Uuid,
+    ) -> Result<bool, DomainError> {
         Ok(true)
     }
 
@@ -595,25 +621,26 @@ struct MockUserRepo {
 
 #[async_trait]
 impl UserRepository for MockUserRepo {
-    async fn get_users(&self) -> Vec<User> {
-        self.users.lock().await.clone()
+    async fn get_users(&self) -> Result<Vec<User>, DomainError> {
+        Ok(self.users.lock().await.clone())
     }
 
-    async fn get_user_by_id(&self, id: Uuid) -> Option<User> {
+    async fn get_user_by_id(&self, id: Uuid) -> Result<Option<User>, DomainError> {
         let lock = self.users.lock().await;
-        lock.iter().find(|u| u.id == id).cloned()
+        Ok(lock.iter().find(|u| u.id == id).cloned())
     }
 
-    async fn get_user_by_username(&self, username: &str) -> Option<User> {
+    async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
         let lock = self.users.lock().await;
-        lock.iter().find(|u| u.username == username).cloned()
+        Ok(lock.iter().find(|u| u.username == username).cloned())
     }
 
-    async fn get_user_by_identifier(&self, identifier: &str) -> Option<User> {
+    async fn get_user_by_identifier(&self, identifier: &str) -> Result<Option<User>, DomainError> {
         let lock = self.users.lock().await;
-        lock.iter()
+        Ok(lock
+            .iter()
             .find(|u| u.username == identifier || u.email == identifier)
-            .cloned()
+            .cloned())
     }
 
     async fn register_user(
@@ -629,7 +656,10 @@ impl UserRepository for MockUserRepo {
         website: Option<String>,
     ) -> Result<User, DomainError> {
         let mut lock = self.users.lock().await;
-        if lock.iter().any(|u| u.username == username || u.email == email) {
+        if lock
+            .iter()
+            .any(|u| u.username == username || u.email == email)
+        {
             return Err(DomainError::new(
                 ErrorCode::AuthUserAlreadyExists,
                 "User already exists",
@@ -681,7 +711,11 @@ impl UserRepository for MockUserRepo {
     async fn is_following(&self, _follower_id: Uuid, _followee_id: Uuid) -> bool {
         false
     }
-    async fn follow_user(&self, _follower_id: Uuid, _followee_id: Uuid) -> Result<User, DomainError> {
+    async fn follow_user(
+        &self,
+        _follower_id: Uuid,
+        _followee_id: Uuid,
+    ) -> Result<User, DomainError> {
         unimplemented!()
     }
     async fn unfollow_user(
@@ -691,11 +725,11 @@ impl UserRepository for MockUserRepo {
     ) -> Result<User, DomainError> {
         unimplemented!()
     }
-    async fn get_followers(&self, _user_id: Uuid) -> Vec<User> {
-        vec![]
+    async fn get_followers(&self, _user_id: Uuid) -> Result<Vec<User>, DomainError> {
+        Ok(vec![])
     }
-    async fn get_following(&self, _user_id: Uuid) -> Vec<User> {
-        vec![]
+    async fn get_following(&self, _user_id: Uuid) -> Result<Vec<User>, DomainError> {
+        Ok(vec![])
     }
     async fn get_followers_count(&self, _user_id: Uuid) -> usize {
         0
@@ -703,13 +737,21 @@ impl UserRepository for MockUserRepo {
     async fn get_following_count(&self, _user_id: Uuid) -> usize {
         0
     }
-    async fn search_users(&self, _query: &str, _limit: Option<usize>) -> Vec<User> {
-        vec![]
+    async fn search_users(
+        &self,
+        _query: &str,
+        _limit: Option<usize>,
+    ) -> Result<Vec<User>, DomainError> {
+        Ok(vec![])
     }
     async fn block_user(&self, _blocker_id: Uuid, _blocked_id: Uuid) -> Result<bool, DomainError> {
         Ok(true)
     }
-    async fn unblock_user(&self, _blocker_id: Uuid, _blocked_id: Uuid) -> Result<bool, DomainError> {
+    async fn unblock_user(
+        &self,
+        _blocker_id: Uuid,
+        _blocked_id: Uuid,
+    ) -> Result<bool, DomainError> {
         Ok(true)
     }
     async fn is_blocking(&self, _blocker_id: Uuid, _blocked_id: Uuid) -> bool {
@@ -733,6 +775,38 @@ impl UserRepository for MockUserRepo {
     async fn disable_2fa(&self, _user_id: Uuid) -> Result<bool, DomainError> {
         Ok(true)
     }
+
+    async fn store_refresh_token(
+        &self,
+        _id: Uuid,
+        _user_id: Uuid,
+        _token_hash: String,
+        _jti: String,
+        _expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn find_refresh_token(
+        &self,
+        _token_hash: &str,
+    ) -> Result<
+        Option<(
+            Uuid,
+            Uuid,
+            String,
+            chrono::DateTime<chrono::Utc>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )>,
+        DomainError,
+    > {
+        Ok(None)
+    }
+    async fn revoke_refresh_token(&self, _token_hash: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn revoke_all_user_refresh_tokens(&self, _user_id: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
     async fn create_follow_request(
         &self,
         _req_id: Uuid,
@@ -754,8 +828,11 @@ impl UserRepository for MockUserRepo {
     ) -> Result<bool, DomainError> {
         Ok(true)
     }
-    async fn get_pending_follow_requests(&self, _tgt_id: Uuid) -> Vec<FollowRequest> {
-        vec![]
+    async fn get_pending_follow_requests(
+        &self,
+        _tgt_id: Uuid,
+    ) -> Result<Vec<FollowRequest>, DomainError> {
+        Ok(vec![])
     }
     async fn has_pending_follow_request(&self, _req_id: Uuid, _tgt_id: Uuid) -> bool {
         false
@@ -774,11 +851,13 @@ async fn test_auth_service_signup_and_login_flow() {
     let auth_config = AuthConfig {
         jwt_secret: "super-secure-secret-key-for-unit-testing".to_string(),
         jwt_expiration_days: 7,
+        access_token_expiration_minutes: 15,
+        refresh_token_expiration_days: 7,
     };
     let service = AuthService::new(mock_repo, auth_config);
 
     // 1. Successful Signup
-    let (token, user) = service
+    let (pair, user) = service
         .signup(
             "alice_dip".to_string(),
             "alice@example.com".to_string(),
@@ -792,23 +871,25 @@ async fn test_auth_service_signup_and_login_flow() {
         )
         .await
         .expect("Signup should succeed");
-    assert!(!token.is_empty());
+    assert!(!pair.access_token.is_empty());
+    assert!(!pair.refresh_token.is_empty());
     assert_eq!(user.username, "alice_dip");
 
     // 2. Login by Username
-    let (login_token, login_user) = service
+    let (login_pair, login_user) = service
         .login("alice_dip", "StrongPassword123!")
         .await
         .expect("Login with username should succeed");
-    assert!(!login_token.is_empty());
+    assert!(!login_pair.access_token.is_empty());
+    assert!(!login_pair.refresh_token.is_empty());
     assert_eq!(login_user.id, user.id);
 
     // 3. Login by Email
-    let (email_token, email_user) = service
+    let (email_pair, email_user) = service
         .login("alice@example.com", "StrongPassword123!")
         .await
         .expect("Login with email should succeed");
-    assert!(!email_token.is_empty());
+    assert!(!email_pair.access_token.is_empty());
     assert_eq!(email_user.id, user.id);
 
     // 4. Login with Wrong Password
@@ -947,7 +1028,10 @@ impl WikiRepository for MockWikiRepo {
             self.revisions.lock().await.push(revision.clone());
             Ok(article.clone())
         } else {
-            Err(DomainError::new(ErrorCode::WikiArticleNotFound, "Article not found"))
+            Err(DomainError::new(
+                ErrorCode::WikiArticleNotFound,
+                "Article not found",
+            ))
         }
     }
 
@@ -971,7 +1055,11 @@ impl WikiRepository for MockWikiRepo {
         _limit: usize,
     ) -> Result<Vec<WikiRevision>, DomainError> {
         let lock = self.revisions.lock().await;
-        Ok(lock.iter().filter(|r| r.article_id == article_id).cloned().collect())
+        Ok(lock
+            .iter()
+            .filter(|r| r.article_id == article_id)
+            .cloned()
+            .collect())
     }
 
     async fn get_all_articles_meta(&self) -> Result<Vec<WikiArticle>, DomainError> {

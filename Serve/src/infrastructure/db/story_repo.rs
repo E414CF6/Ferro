@@ -46,41 +46,56 @@ impl StoryRepository for Database {
         Ok(story)
     }
 
-    async fn get_story_by_id(&self, id: Uuid) -> Option<Story> {
-        db_fetch_optional!(self, StoryEntity, "SELECT * FROM stories WHERE id = $1", id)
-            .ok()
-            .flatten()
-            .map(Story::from)
+    async fn get_story_by_id(&self, id: Uuid) -> Result<Option<Story>, DomainError> {
+        let entity = db_fetch_optional!(
+            self,
+            StoryEntity,
+            "SELECT * FROM stories WHERE id = $1",
+            id
+        )
+        .map_err(|e| {
+            error!(target: "serve::story_repo", error = %e, id = %id, "Failed to get story by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get story by id")
+        })?;
+
+        Ok(entity.map(Story::from))
     }
 
-    async fn get_active_stories_for_user(&self, author_id: Uuid) -> Vec<Story> {
+    async fn get_active_stories_for_user(
+        &self,
+        author_id: Uuid,
+    ) -> Result<Vec<Story>, DomainError> {
         let now = Utc::now();
-        db_fetch_all!(
+        let entities = db_fetch_all!(
             self,
             StoryEntity,
             "SELECT * FROM stories WHERE author_id = $1 AND expires_at > $2 ORDER BY created_at",
             author_id,
             now
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(Story::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::story_repo", error = %e, author_id = %author_id, "Failed to get active stories");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get active stories")
+        })?;
+
+        Ok(entities.into_iter().map(Story::from).collect())
     }
 
-    async fn get_stories_feed_for_user(&self, user_id: Uuid) -> Vec<Story> {
+    async fn get_stories_feed_for_user(&self, user_id: Uuid) -> Result<Vec<Story>, DomainError> {
         let now = Utc::now();
-        db_fetch_all!(
+        let entities = db_fetch_all!(
             self,
             StoryEntity,
             "SELECT s.* FROM stories s WHERE s.expires_at > $1 AND (s.author_id = $2 OR s.author_id IN (SELECT followee_id FROM follows WHERE follower_id = $2)) ORDER BY s.created_at DESC",
             now,
             user_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(Story::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::story_repo", error = %e, user_id = %user_id, "Failed to get stories feed");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get stories feed")
+        })?;
+
+        Ok(entities.into_iter().map(Story::from).collect())
     }
 
     async fn delete_story(&self, story_id: Uuid, author_id: Uuid) -> Result<bool, DomainError> {
@@ -145,17 +160,19 @@ impl StoryRepository for Database {
         .unwrap_or(false)
     }
 
-    async fn get_story_viewers(&self, story_id: Uuid) -> Vec<User> {
-        db_fetch_all!(
+    async fn get_story_viewers(&self, story_id: Uuid) -> Result<Vec<User>, DomainError> {
+        let entities = db_fetch_all!(
             self,
             UserEntity,
             "SELECT u.* FROM users u JOIN story_views v ON u.id = v.viewer_id WHERE v.story_id = $1 ORDER BY v.viewed_at DESC",
             story_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(User::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::story_repo", error = %e, story_id = %story_id, "Failed to get story viewers");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get story viewers")
+        })?;
+
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
     async fn has_active_stories(&self, author_id: Uuid) -> bool {
@@ -168,5 +185,26 @@ impl StoryRepository for Database {
             now
         )
         .unwrap_or(false)
+    }
+
+    async fn prune_expired_stories(
+        &self,
+        older_than: chrono::DateTime<chrono::Utc>,
+    ) -> Result<u64, DomainError> {
+        let _ = db_execute!(
+            self,
+            "DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE expires_at < $1)",
+            older_than
+        );
+        let rows = db_execute!(
+            self,
+            "DELETE FROM stories WHERE expires_at < $1",
+            older_than
+        )
+        .map_err(|e| {
+            error!(target: "serve::db", error = %e, "Failed to prune expired stories");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to prune expired stories")
+        })?;
+        Ok(rows.rows_affected())
     }
 }

@@ -688,7 +688,25 @@ async fn test_social_features_flow() {
         "#,
         poll_post_id
     );
-    let res = schema.execute(analytics_query.as_str()).await;
+
+    // 13-a. Bob (non-author) attempts to view Alice's post analytics -> Forbidden
+    let req_bob = Request::new(analytics_query.as_str()).data(auth_bob.clone());
+    let res_bob = schema.execute(req_bob).await;
+    assert!(
+        !res_bob.errors.is_empty(),
+        "Bob should not be able to view Alice's post analytics"
+    );
+    let bob_err_json = serde_json::to_value(&res_bob).unwrap();
+    assert_eq!(
+        bob_err_json["errors"][0]["extensions"]["code"]
+            .as_str()
+            .unwrap(),
+        "FORBIDDEN"
+    );
+
+    // 13-b. Alice (author) views her own post analytics -> Success
+    let req_alice = Request::new(analytics_query.as_str()).data(auth_alice.clone());
+    let res = schema.execute(req_alice).await;
     assert!(res.errors.is_empty());
     let an_data = serde_json::to_value(&res.data).unwrap();
     assert!(an_data["postAnalytics"]["viewsCount"].as_i64().unwrap() >= 1);

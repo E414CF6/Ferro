@@ -621,4 +621,3 @@ pub struct ArticleFilterParams {
     pub max_lng: Option<f64>,
     pub limit: Option<usize>,
 }
-

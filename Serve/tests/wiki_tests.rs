@@ -1,7 +1,7 @@
 use async_graphql::Request;
 use chrono::Utc;
-use serve::domain::models::{WikiArticle, WikiRevision};
 use serve::domain::WikiRepository;
+use serve::domain::models::{WikiArticle, WikiRevision};
 use serve::graphql::build_schema;
 use serve::infrastructure::{
     auth::AuthUser,
@@ -57,7 +57,11 @@ async fn test_wiki_graphql_crud_and_slug_generation() {
     "##;
 
     let res = schema.execute(Request::new(create_mutation)).await;
-    assert!(res.errors.is_empty(), "Create article error: {:?}", res.errors);
+    assert!(
+        res.errors.is_empty(),
+        "Create article error: {:?}",
+        res.errors
+    );
 
     let data = res.data.into_json().unwrap();
     let article_data = &data["createArticle"];
@@ -134,7 +138,11 @@ async fn test_wiki_graphql_crud_and_slug_generation() {
     );
 
     let res_update = schema.execute(Request::new(&update_mutation)).await;
-    assert!(res_update.errors.is_empty(), "Update error: {:?}", res_update.errors);
+    assert!(
+        res_update.errors.is_empty(),
+        "Update error: {:?}",
+        res_update.errors
+    );
     let update_data = res_update.data.into_json().unwrap();
     let updated_article = &update_data["updateArticle"];
     assert_eq!(updated_article["title"], "경복궁 역사 나들이");
@@ -207,7 +215,11 @@ async fn test_wiki_graphql_crud_and_slug_generation() {
         }
     "##;
     let res_trends = schema.execute(Request::new(trends_query)).await;
-    assert!(res_trends.errors.is_empty(), "Trends error: {:?}", res_trends.errors);
+    assert!(
+        res_trends.errors.is_empty(),
+        "Trends error: {:?}",
+        res_trends.errors
+    );
     let trends_data = res_trends.data.into_json().unwrap();
     let wiki_trends = &trends_data["wikiTrends"];
     assert_eq!(wiki_trends["totalArticles"], 2);
@@ -340,7 +352,9 @@ async fn test_wiki_article_transaction_atomicity() {
     let _ = std::fs::remove_file(format!("{}-wal", test_file));
 
     let config = DatabaseConfig::sqlite_mode(&test_file);
-    let db = Database::connect(&config).await.expect("Failed to initialize SQLite");
+    let db = Database::connect(&config)
+        .await
+        .expect("Failed to initialize SQLite");
 
     let article_id = Uuid::new_v4();
     let rev_id = Uuid::new_v4();

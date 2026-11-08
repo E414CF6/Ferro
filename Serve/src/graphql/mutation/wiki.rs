@@ -19,9 +19,9 @@ impl WikiMutation {
         let auth_user = ctx.data_opt::<AuthUser>();
 
         let user_id = auth_user.map(|u| u.user_id);
-        let author_name = input.author.or_else(|| {
-            auth_user.map(|u| u.username.clone())
-        });
+        let author_name = input
+            .author
+            .or_else(|| auth_user.map(|u| u.username.clone()));
 
         let article = services
             .wiki
@@ -54,9 +54,9 @@ impl WikiMutation {
         let auth_user = ctx.data_opt::<AuthUser>();
 
         let user_id = auth_user.map(|u| u.user_id);
-        let author_name = input.author.or_else(|| {
-            auth_user.map(|u| u.username.clone())
-        });
+        let author_name = input
+            .author
+            .or_else(|| auth_user.map(|u| u.username.clone()));
 
         let updated = services
             .wiki

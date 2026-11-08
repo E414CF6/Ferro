@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use crate::domain::errors::DomainError;
 use crate::domain::models::{Post, User};
 use crate::domain::repositories::{PostRepository, UserRepository};
 use crate::infrastructure::db::postgres::Database;
@@ -17,7 +18,11 @@ impl DiscoveryService {
         Self { db }
     }
 
-    pub async fn search_users(&self, query: &str, limit: Option<usize>) -> Vec<User> {
+    pub async fn search_users(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<User>, DomainError> {
         self.db.search_users(query, limit).await
     }
 
@@ -26,11 +31,14 @@ impl DiscoveryService {
         query: &str,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         self.db.search_posts_cursor(query, first, after).await
     }
 
-    pub async fn get_trending_hashtags(&self, limit: Option<usize>) -> Vec<(String, usize)> {
+    pub async fn get_trending_hashtags(
+        &self,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, usize)>, DomainError> {
         self.db.get_trending_hashtags(limit).await
     }
 }

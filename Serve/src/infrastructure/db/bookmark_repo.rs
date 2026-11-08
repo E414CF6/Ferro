@@ -14,7 +14,7 @@ impl BookmarkRepository for Database {
     async fn save_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
         let post = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let _ = db_execute!(
@@ -31,7 +31,7 @@ impl BookmarkRepository for Database {
     async fn unsave_post(&self, user_id: Uuid, post_id: Uuid) -> Result<Post, DomainError> {
         let post = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         let _ = db_execute!(
@@ -60,7 +60,7 @@ impl BookmarkRepository for Database {
         user_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<Post> {
+    ) -> Result<Vec<Post>, DomainError> {
         let lim = limit.unwrap_or(50) as i64;
         let off = offset.unwrap_or(0) as i64;
         let entities: Vec<PostEntity> = db_fetch_all!(
@@ -71,9 +71,12 @@ impl BookmarkRepository for Database {
             lim,
             off
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::bookmark_repo", error = %e, user_id = %user_id, "Failed to get saved posts");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get saved posts")
+        })?;
 
-        entities.into_iter().map(Post::from).collect()
+        Ok(entities.into_iter().map(Post::from).collect())
     }
 
     async fn get_saved_posts_cursor(
@@ -81,7 +84,7 @@ impl BookmarkRepository for Database {
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<PostEntity> = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -110,11 +113,14 @@ impl BookmarkRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::bookmark_repo", error = %e, user_id = %user_id, "Failed to get saved posts cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get saved posts cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     async fn create_bookmark_collection(
@@ -168,7 +174,7 @@ impl BookmarkRepository for Database {
     ) -> Result<BookmarkCollection, DomainError> {
         let current = self
             .get_collection_by_id(collection_id)
-            .await
+            .await?
             .ok_or_else(|| {
                 DomainError::new(ErrorCode::CollectionNotFound, "Collection not found")
             })?;
@@ -208,7 +214,7 @@ impl BookmarkRepository for Database {
         }
 
         self.get_collection_by_id(collection_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CollectionNotFound, "Collection not found"))
     }
 
@@ -249,7 +255,7 @@ impl BookmarkRepository for Database {
     ) -> Result<bool, DomainError> {
         let col = self
             .get_collection_by_id(collection_id)
-            .await
+            .await?
             .ok_or_else(|| {
                 DomainError::new(ErrorCode::CollectionNotFound, "Collection not found")
             })?;
@@ -280,7 +286,7 @@ impl BookmarkRepository for Database {
     ) -> Result<bool, DomainError> {
         let col = self
             .get_collection_by_id(collection_id)
-            .await
+            .await?
             .ok_or_else(|| {
                 DomainError::new(ErrorCode::CollectionNotFound, "Collection not found")
             })?;
@@ -302,29 +308,40 @@ impl BookmarkRepository for Database {
         Ok(true)
     }
 
-    async fn get_user_collections(&self, user_id: Uuid) -> Vec<BookmarkCollection> {
+    async fn get_user_collections(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<BookmarkCollection>, DomainError> {
         let entities: Vec<BookmarkCollectionEntity> = db_fetch_all!(
             self,
             BookmarkCollectionEntity,
             "SELECT * FROM bookmark_collections WHERE user_id = $1 ORDER BY created_at DESC",
             user_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::bookmark_repo", error = %e, user_id = %user_id, "Failed to get user collections");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user collections")
+        })?;
 
-        entities.into_iter().map(BookmarkCollection::from).collect()
+        Ok(entities.into_iter().map(BookmarkCollection::from).collect())
     }
 
-    async fn get_collection_by_id(&self, collection_id: Uuid) -> Option<BookmarkCollection> {
+    async fn get_collection_by_id(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Option<BookmarkCollection>, DomainError> {
         let entity: Option<BookmarkCollectionEntity> = db_fetch_optional!(
             self,
             BookmarkCollectionEntity,
             "SELECT * FROM bookmark_collections WHERE id = $1",
             collection_id
         )
-        .ok()
-        .flatten();
+        .map_err(|e| {
+            error!(target: "serve::bookmark_repo", error = %e, collection_id = %collection_id, "Failed to get collection by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get collection by id")
+        })?;
 
-        entity.map(BookmarkCollection::from)
+        Ok(entity.map(BookmarkCollection::from))
     }
 
     async fn get_collection_posts_cursor(
@@ -332,7 +349,7 @@ impl BookmarkRepository for Database {
         collection_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool) {
+    ) -> Result<(Vec<Post>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<PostEntity> = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -361,10 +378,13 @@ impl BookmarkRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::bookmark_repo", error = %e, collection_id = %collection_id, "Failed to get collection posts cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get collection posts cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Post> = entities.into_iter().take(first).map(Post::from).collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 }

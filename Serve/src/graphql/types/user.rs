@@ -4,23 +4,21 @@ use chrono::{DateTime, Utc};
 
 use crate::domain::errors::{DomainError, ErrorCode};
 use crate::domain::models::{
-    FollowRequest as FollowRequestModel,
-    FollowRequestStatus as FollowRequestStatusModel,
-    User as UserModel,
-    UserList as UserListModel,
+    FollowRequest as FollowRequestModel, FollowRequestStatus as FollowRequestStatusModel,
+    User as UserModel, UserList as UserListModel,
 };
 use crate::domain::repositories::*;
 use crate::infrastructure::auth::AuthUser;
 use crate::infrastructure::db::loaders::{
     FollowersCountLoader, FollowingCountLoader, HasActiveStoriesLoader,
-    HasPendingFollowRequestLoader, IsBlockedLoader, IsFollowingLoader,
-    IsMutedLoader, UserLoader, UserPostsCountLoader,
+    HasPendingFollowRequestLoader, IsBlockedLoader, IsFollowingLoader, IsMutedLoader, UserLoader,
+    UserPostsCountLoader,
 };
 use crate::infrastructure::db::postgres::Database;
 
 use super::{
-    decode_cursor, encode_cursor, BookmarkCollectionGql, CommentGql,
-    PageInfoGql, PostConnectionGql, PostEdgeGql, PostGql, StoryGql,
+    BookmarkCollectionGql, CommentGql, PageInfoGql, PostConnectionGql, PostEdgeGql, PostGql,
+    StoryGql, decode_cursor, encode_cursor,
 };
 
 #[derive(Clone)]
@@ -94,13 +92,13 @@ impl UserGql {
 
     async fn posts(&self, ctx: &Context<'_>) -> Result<Vec<PostGql>> {
         let db = ctx.data::<Database>()?;
-        let posts = db.get_posts_by_author(self.0.id).await;
+        let posts = db.get_posts_by_author(self.0.id).await?;
         Ok(posts.into_iter().map(PostGql).collect())
     }
 
     async fn active_stories(&self, ctx: &Context<'_>) -> Result<Vec<StoryGql>> {
         let db = ctx.data::<Database>()?;
-        let stories = db.get_active_stories_for_user(self.0.id).await;
+        let stories = db.get_active_stories_for_user(self.0.id).await?;
         Ok(stories.into_iter().map(StoryGql).collect())
     }
 
@@ -117,7 +115,7 @@ impl UserGql {
 
     async fn liked_posts(&self, ctx: &Context<'_>) -> Result<Vec<PostGql>> {
         let db = ctx.data::<Database>()?;
-        let posts = db.get_liked_posts_by_user(self.0.id).await;
+        let posts = db.get_liked_posts_by_user(self.0.id).await?;
         Ok(posts.into_iter().map(PostGql).collect())
     }
 
@@ -128,37 +126,37 @@ impl UserGql {
         offset: Option<usize>,
     ) -> Result<Vec<PostGql>> {
         let db = ctx.data::<Database>()?;
-        let posts = db.get_saved_posts(self.0.id, limit, offset).await;
+        let posts = db.get_saved_posts(self.0.id, limit, offset).await?;
         Ok(posts.into_iter().map(PostGql).collect())
     }
 
     async fn collections(&self, ctx: &Context<'_>) -> Result<Vec<BookmarkCollectionGql>> {
         let db = ctx.data::<Database>()?;
-        let colls = db.get_user_collections(self.0.id).await;
+        let colls = db.get_user_collections(self.0.id).await?;
         Ok(colls.into_iter().map(BookmarkCollectionGql).collect())
     }
 
     async fn lists(&self, ctx: &Context<'_>) -> Result<Vec<UserListGql>> {
         let db = ctx.data::<Database>()?;
-        let lists = db.get_user_lists(self.0.id).await;
+        let lists = db.get_user_lists(self.0.id).await?;
         Ok(lists.into_iter().map(UserListGql).collect())
     }
 
     async fn comments(&self, ctx: &Context<'_>) -> Result<Vec<CommentGql>> {
         let db = ctx.data::<Database>()?;
-        let comments = db.get_comments_by_user(self.0.id).await;
+        let comments = db.get_comments_by_user(self.0.id).await?;
         Ok(comments.into_iter().map(CommentGql).collect())
     }
 
     async fn followers(&self, ctx: &Context<'_>) -> Result<Vec<UserGql>> {
         let db = ctx.data::<Database>()?;
-        let followers = db.get_followers(self.0.id).await;
+        let followers = db.get_followers(self.0.id).await?;
         Ok(followers.into_iter().map(UserGql).collect())
     }
 
     async fn following(&self, ctx: &Context<'_>) -> Result<Vec<UserGql>> {
         let db = ctx.data::<Database>()?;
-        let following = db.get_following(self.0.id).await;
+        let following = db.get_following(self.0.id).await?;
         Ok(following.into_iter().map(UserGql).collect())
     }
 
@@ -288,6 +286,9 @@ impl UserGql {
 #[derive(Clone)]
 pub struct AuthPayloadGql {
     pub token: String,
+    pub refresh_token: Option<String>,
+    pub expires_in: Option<i64>,
+    pub token_type: Option<String>,
     pub user: UserGql,
 }
 
@@ -295,6 +296,18 @@ pub struct AuthPayloadGql {
 impl AuthPayloadGql {
     async fn token(&self) -> &str {
         &self.token
+    }
+
+    async fn refresh_token(&self) -> Option<&str> {
+        self.refresh_token.as_deref()
+    }
+
+    async fn expires_in(&self) -> Option<i64> {
+        self.expires_in
+    }
+
+    async fn token_type(&self) -> Option<&str> {
+        self.token_type.as_deref()
     }
 
     async fn user(&self) -> &UserGql {
@@ -348,7 +361,7 @@ impl UserListGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let owner = db.get_user_by_id(self.0.owner_id).await.ok_or_else(|| {
+            let owner = db.get_user_by_id(self.0.owner_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::UserNotFound, "Owner not found").extend()
             })?;
             Ok(UserGql(owner))
@@ -357,13 +370,13 @@ impl UserListGql {
 
     async fn members(&self, ctx: &Context<'_>) -> Result<Vec<UserGql>> {
         let db = ctx.data::<Database>()?;
-        let members = db.get_list_members(self.0.id).await;
+        let members = db.get_list_members(self.0.id).await?;
         Ok(members.into_iter().map(UserGql).collect())
     }
 
     async fn members_count(&self, ctx: &Context<'_>) -> Result<usize> {
         let db = ctx.data::<Database>()?;
-        Ok(db.get_list_members(self.0.id).await.len())
+        Ok(db.get_list_members(self.0.id).await?.len())
     }
 
     async fn feed(
@@ -382,7 +395,7 @@ impl UserListGql {
 
         let (posts, has_next_page) = db
             .get_list_feed_cursor(self.0.id, page_size, cursor_pair)
-            .await;
+            .await?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 
@@ -440,7 +453,7 @@ impl FollowRequestGql {
         let db = ctx.data::<Database>()?;
         let user = db
             .get_user_by_id(self.0.requester_id)
-            .await
+            .await?
             .ok_or_else(|| {
                 DomainError::new(ErrorCode::UserNotFound, "Requester not found").extend()
             })?;
@@ -449,7 +462,7 @@ impl FollowRequestGql {
 
     async fn target(&self, ctx: &Context<'_>) -> Result<UserGql> {
         let db = ctx.data::<Database>()?;
-        let user = db.get_user_by_id(self.0.target_id).await.ok_or_else(|| {
+        let user = db.get_user_by_id(self.0.target_id).await?.ok_or_else(|| {
             DomainError::new(ErrorCode::UserNotFound, "Target user not found").extend()
         })?;
         Ok(UserGql(user))

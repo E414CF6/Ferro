@@ -53,10 +53,10 @@ impl NotificationRepository for Database {
         user_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<Notification> {
+    ) -> Result<Vec<Notification>, DomainError> {
         let lim = limit.unwrap_or(50) as i64;
         let off = offset.unwrap_or(0) as i64;
-        db_fetch_all!(
+        let entities = db_fetch_all!(
             self,
             NotificationEntity,
             "SELECT * FROM notifications WHERE recipient_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3",
@@ -64,10 +64,12 @@ impl NotificationRepository for Database {
             lim,
             off
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(Notification::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::notification_repo", error = %e, user_id = %user_id, "Failed to get notifications");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get notifications")
+        })?;
+
+        Ok(entities.into_iter().map(Notification::from).collect())
     }
 
     async fn get_notifications_cursor(
@@ -75,7 +77,7 @@ impl NotificationRepository for Database {
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Notification>, bool) {
+    ) -> Result<(Vec<Notification>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -90,8 +92,7 @@ impl NotificationRepository for Database {
                 after_time,
                 after_id,
                 fetch_limit
-            )
-            .unwrap_or_default(),
+            ),
             None => db_fetch_all!(
                 self,
                 NotificationEntity,
@@ -101,9 +102,12 @@ impl NotificationRepository for Database {
                      LIMIT $2",
                 user_id,
                 fetch_limit
-            )
-            .unwrap_or_default(),
-        };
+            ),
+        }
+        .map_err(|e| {
+            error!(target: "serve::notification_repo", error = %e, user_id = %user_id, "Failed to get notifications cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get notifications cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Notification> = entities
@@ -112,7 +116,7 @@ impl NotificationRepository for Database {
             .map(Notification::from)
             .collect();
 
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     async fn get_unread_notifications_count(&self, user_id: Uuid) -> usize {

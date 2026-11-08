@@ -30,12 +30,21 @@ impl<R: NotificationRepository> NotificationService<R> {
             .await
     }
 
+    pub async fn get_notifications(
+        &self,
+        user_id: Uuid,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<Vec<Notification>, DomainError> {
+        self.repo.get_notifications(user_id, limit, offset).await
+    }
+
     pub async fn get_notifications_cursor(
         &self,
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Notification>, bool) {
+    ) -> Result<(Vec<Notification>, bool), DomainError> {
         self.repo
             .get_notifications_cursor(user_id, first, after)
             .await

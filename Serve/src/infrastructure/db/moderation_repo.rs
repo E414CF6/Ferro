@@ -85,15 +85,21 @@ impl ModerationRepository for Database {
             "SELECT * FROM reports WHERE id = $1",
             report_id
         )
-        .ok()
-        .flatten();
+        .map_err(|e| {
+            error!(target: "serve::moderation_repo", error = %e, report_id = %report_id, "Failed to get report by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get report")
+        })?;
 
         entity
             .map(Report::from)
             .ok_or_else(|| DomainError::new(ErrorCode::ReportNotFound, "Report not found"))
     }
 
-    async fn get_reports(&self, status: Option<ReportStatus>, limit: Option<usize>) -> Vec<Report> {
+    async fn get_reports(
+        &self,
+        status: Option<ReportStatus>,
+        limit: Option<usize>,
+    ) -> Result<Vec<Report>, DomainError> {
         let lim = limit.unwrap_or(50) as i64;
         let entities: Vec<ReportEntity> = match status {
             Some(st) => db_fetch_all!(
@@ -110,8 +116,11 @@ impl ModerationRepository for Database {
                 lim
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::moderation_repo", error = %e, "Failed to get reports");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get reports")
+        })?;
 
-        entities.into_iter().map(Report::from).collect()
+        Ok(entities.into_iter().map(Report::from).collect())
     }
 }

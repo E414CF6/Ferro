@@ -21,7 +21,7 @@ pub trait DmRepository: Send + Sync {
         user2_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<DirectMessage>;
+    ) -> Result<Vec<DirectMessage>, DomainError>;
 
     async fn get_direct_messages_cursor(
         &self,
@@ -29,9 +29,12 @@ pub trait DmRepository: Send + Sync {
         user2_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<DirectMessage>, bool);
+    ) -> Result<(Vec<DirectMessage>, bool), DomainError>;
 
-    async fn get_conversations(&self, user_id: Uuid) -> Vec<ConversationSummary>;
+    async fn get_conversations(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<ConversationSummary>, DomainError>;
 
     async fn mark_direct_messages_as_read(
         &self,
@@ -49,9 +52,15 @@ pub trait DmRepository: Send + Sync {
         participant_ids: Vec<Uuid>,
     ) -> Result<Conversation, DomainError>;
 
-    async fn get_conversation_by_id(&self, conversation_id: Uuid) -> Option<Conversation>;
+    async fn get_conversation_by_id(
+        &self,
+        conversation_id: Uuid,
+    ) -> Result<Option<Conversation>, DomainError>;
 
-    async fn get_conversation_participants(&self, conversation_id: Uuid) -> Vec<User>;
+    async fn get_conversation_participants(
+        &self,
+        conversation_id: Uuid,
+    ) -> Result<Vec<User>, DomainError>;
 
     async fn send_conversation_message(
         &self,
@@ -65,14 +74,14 @@ pub trait DmRepository: Send + Sync {
         conversation_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<DirectMessage>;
+    ) -> Result<Vec<DirectMessage>, DomainError>;
 
     async fn get_conversation_messages_cursor(
         &self,
         conversation_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<DirectMessage>, bool);
+    ) -> Result<(Vec<DirectMessage>, bool), DomainError>;
 
     async fn edit_direct_message(
         &self,
@@ -87,5 +96,8 @@ pub trait DmRepository: Send + Sync {
         sender_id: Uuid,
     ) -> Result<bool, DomainError>;
 
-    async fn get_user_group_conversations(&self, user_id: Uuid) -> Vec<Conversation>;
+    async fn get_user_group_conversations(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<Conversation>, DomainError>;
 }

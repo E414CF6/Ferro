@@ -4,6 +4,7 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Json, Response},
 };
+use chrono::Utc;
 use serde_json::json;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -21,24 +22,40 @@ struct RateBucket {
     window_start: Instant,
 }
 
-/// Thread-safe in-memory sliding window rate limiter
+/// Thread-safe hybrid (Redis distributed + in-memory fallback) sliding window rate limiter
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
     max_requests: usize,
     window_duration: Duration,
     clients: Arc<RwLock<HashMap<String, RateBucket>>>,
+    redis_client: Option<redis::Client>,
 }
 
 impl RateLimiter {
-    /// Create new rate limiter: `max_requests` per `window_duration`
+    /// Create new in-memory rate limiter: `max_requests` per `window_duration`
     pub fn new(max_requests: usize, window_duration: Duration) -> Self {
+        Self::with_redis_opt(max_requests, window_duration, None)
+    }
+
+    /// Create distributed Redis-backed rate limiter with in-memory fallback
+    pub fn with_redis(max_requests: usize, window_duration: Duration, redis_url: &str) -> Self {
+        let client = redis::Client::open(redis_url).ok();
+        Self::with_redis_opt(max_requests, window_duration, client)
+    }
+
+    pub fn with_redis_opt(
+        max_requests: usize,
+        window_duration: Duration,
+        redis_client: Option<redis::Client>,
+    ) -> Self {
         let limiter = Self {
             max_requests,
             window_duration,
             clients: Arc::new(RwLock::new(HashMap::new())),
+            redis_client,
         };
 
-        // Periodic background cleanup of stale entries every 60 seconds
+        // Periodic background cleanup of stale entries in local in-memory fallback map
         let clients_clone = limiter.clients.clone();
         let window = window_duration;
         tokio::spawn(async move {
@@ -57,6 +74,58 @@ impl RateLimiter {
     /// Check if a request from the given key (e.g. IP address or client ID) is allowed.
     /// Returns `(is_allowed, remaining_requests, reset_after_seconds)`
     pub async fn check(&self, key: &str) -> (bool, usize, u64) {
+        if let Some(ref client) = self.redis_client {
+            if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
+                let redis_key = format!("ferro:ratelimit:{}", key);
+                let now_ms = Utc::now().timestamp_millis();
+                let window_ms = self.window_duration.as_millis() as i64;
+                let clear_before = now_ms - window_ms;
+                let max_req = self.max_requests as i64;
+
+                let script = redis::Script::new(
+                    r#"
+                    local key = KEYS[1]
+                    local now = tonumber(ARGV[1])
+                    local clear_before = tonumber(ARGV[2])
+                    local window_secs = tonumber(ARGV[3])
+                    local max_req = tonumber(ARGV[4])
+
+                    redis.call('ZREMRANGEBYSCORE', key, '-inf', clear_before)
+                    local current = redis.call('ZCARD', key)
+                    if current < max_req then
+                        redis.call('ZADD', key, now, now .. ':' .. redis.call('INCR', key .. ':seq'))
+                        redis.call('EXPIRE', key, window_secs * 2)
+                        return {1, max_req - current - 1, window_secs}
+                    else
+                        return {0, 0, window_secs}
+                    end
+                "#,
+                );
+
+                let res: Result<(i64, i64, i64), _> = script
+                    .key(&redis_key)
+                    .arg(now_ms)
+                    .arg(clear_before)
+                    .arg(self.window_duration.as_secs() as i64)
+                    .arg(max_req)
+                    .invoke_async(&mut conn)
+                    .await;
+
+                if let Ok((allowed, remaining, reset_after)) = res {
+                    return (
+                        allowed == 1,
+                        remaining.max(0) as usize,
+                        reset_after.max(1) as u64,
+                    );
+                }
+            }
+        }
+
+        self.check_in_memory(key).await
+    }
+
+    /// In-memory sliding window check
+    pub async fn check_in_memory(&self, key: &str) -> (bool, usize, u64) {
         let now = Instant::now();
         let mut map = self.clients.write().await;
 
@@ -93,6 +162,10 @@ impl RateLimiter {
 
     pub fn max_requests(&self) -> usize {
         self.max_requests
+    }
+
+    pub fn is_redis_connected(&self) -> bool {
+        self.redis_client.is_some()
     }
 }
 
@@ -170,8 +243,15 @@ pub async fn rate_limit_middleware(
     }
 
     let headers = req.headers();
-    let connect_info = req.extensions().get::<ConnectInfo<SocketAddr>>().map(|ci| ci.0);
-    let client_ip = extract_client_ip(headers, connect_info.as_ref(), config.rate_limit.trust_proxy);
+    let connect_info = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0);
+    let client_ip = extract_client_ip(
+        headers,
+        connect_info.as_ref(),
+        config.rate_limit.trust_proxy,
+    );
 
     let (allowed, remaining, reset_after) = rate_limiter.check(&client_ip).await;
 

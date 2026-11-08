@@ -19,5 +19,9 @@ pub trait ModerationRepository: Send + Sync {
         report_id: Uuid,
         status: ReportStatus,
     ) -> Result<Report, DomainError>;
-    async fn get_reports(&self, status: Option<ReportStatus>, limit: Option<usize>) -> Vec<Report>;
+    async fn get_reports(
+        &self,
+        status: Option<ReportStatus>,
+        limit: Option<usize>,
+    ) -> Result<Vec<Report>, DomainError>;
 }

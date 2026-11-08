@@ -61,42 +61,49 @@ impl PollRepository for Database {
         })
     }
 
-    async fn get_poll_by_post_id(&self, post_id: Uuid) -> Option<Poll> {
+    async fn get_poll_by_post_id(&self, post_id: Uuid) -> Result<Option<Poll>, DomainError> {
         let entity: Option<PollEntity> = db_fetch_optional!(
             self,
             PollEntity,
             "SELECT * FROM polls WHERE post_id = $1",
             post_id
         )
-        .ok()
-        .flatten();
+        .map_err(|e| {
+            error!(target: "serve::poll_repo", error = %e, post_id = %post_id, "Failed to get poll by post id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get poll by post id")
+        })?;
 
-        entity.map(Poll::from)
+        Ok(entity.map(Poll::from))
     }
 
-    async fn get_poll_by_id(&self, poll_id: Uuid) -> Option<Poll> {
+    async fn get_poll_by_id(&self, poll_id: Uuid) -> Result<Option<Poll>, DomainError> {
         let entity: Option<PollEntity> = db_fetch_optional!(
             self,
             PollEntity,
             "SELECT * FROM polls WHERE id = $1",
             poll_id
         )
-        .ok()
-        .flatten();
+        .map_err(|e| {
+            error!(target: "serve::poll_repo", error = %e, poll_id = %poll_id, "Failed to get poll by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get poll by id")
+        })?;
 
-        entity.map(Poll::from)
+        Ok(entity.map(Poll::from))
     }
 
-    async fn get_poll_options(&self, poll_id: Uuid) -> Vec<PollOption> {
+    async fn get_poll_options(&self, poll_id: Uuid) -> Result<Vec<PollOption>, DomainError> {
         let entities: Vec<PollOptionEntity> = db_fetch_all!(
             self,
             PollOptionEntity,
             "SELECT * FROM poll_options WHERE poll_id = $1 ORDER BY sort_order ASC",
             poll_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::poll_repo", error = %e, poll_id = %poll_id, "Failed to get poll options");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get poll options")
+        })?;
 
-        entities.into_iter().map(PollOption::from).collect()
+        Ok(entities.into_iter().map(PollOption::from).collect())
     }
 
     async fn vote_poll(
@@ -107,7 +114,7 @@ impl PollRepository for Database {
     ) -> Result<PollVote, DomainError> {
         let poll = self
             .get_poll_by_id(poll_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PollNotFound, "Poll not found"))?;
 
         if Utc::now() > poll.expires_at {
@@ -163,14 +170,23 @@ impl PollRepository for Database {
         .unwrap_or(0) as usize
     }
 
-    async fn get_user_vote_for_poll(&self, poll_id: Uuid, user_id: Uuid) -> Option<Uuid> {
-        db_scalar!(
+    async fn get_user_vote_for_poll(
+        &self,
+        poll_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<Uuid>, DomainError> {
+        let res = db_scalar_optional!(
             self,
             Uuid,
             "SELECT option_id FROM poll_votes WHERE poll_id = $1 AND user_id = $2",
             poll_id,
             user_id
         )
-        .ok()
+        .map_err(|e| {
+            error!(target: "serve::poll_repo", error = %e, poll_id = %poll_id, user_id = %user_id, "Failed to get user vote for poll");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user vote for poll")
+        })?;
+
+        Ok(res)
     }
 }

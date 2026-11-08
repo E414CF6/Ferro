@@ -70,7 +70,7 @@ impl NotificationGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let user = db.get_user_by_id(self.0.actor_id).await.ok_or_else(|| {
+            let user = db.get_user_by_id(self.0.actor_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::UserNotFound, "Actor user not found").extend()
             })?;
             Ok(UserGql(user))
@@ -87,7 +87,7 @@ impl NotificationGql {
             let db = ctx.data::<Database>()?;
             let user = db
                 .get_user_by_id(self.0.recipient_id)
-                .await
+                .await?
                 .ok_or_else(|| {
                     DomainError::new(ErrorCode::UserNotFound, "Recipient user not found").extend()
                 })?;
@@ -122,7 +122,7 @@ impl NotificationGql {
                     Ok(post_opt.map(PostGql))
                 } else {
                     let db = ctx.data::<Database>()?;
-                    Ok(db.get_post_by_id(eid).await.map(PostGql))
+                    Ok(db.get_post_by_id(eid).await?.map(PostGql))
                 }
             }
             NotificationTypeModel::CommentPost
@@ -133,7 +133,7 @@ impl NotificationGql {
                     loader.load_one(eid).await?
                 } else {
                     let db = ctx.data::<Database>()?;
-                    db.get_comment_by_id(eid).await
+                    db.get_comment_by_id(eid).await?
                 };
 
                 if let Some(comment) = comment_opt {
@@ -142,7 +142,7 @@ impl NotificationGql {
                         Ok(post_opt.map(PostGql))
                     } else {
                         let db = ctx.data::<Database>()?;
-                        Ok(db.get_post_by_id(comment.post_id).await.map(PostGql))
+                        Ok(db.get_post_by_id(comment.post_id).await?.map(PostGql))
                     }
                 } else {
                     Ok(None)
@@ -165,7 +165,7 @@ impl NotificationGql {
                     Ok(comment_opt.map(CommentGql))
                 } else {
                     let db = ctx.data::<Database>()?;
-                    Ok(db.get_comment_by_id(eid).await.map(CommentGql))
+                    Ok(db.get_comment_by_id(eid).await?.map(CommentGql))
                 }
             }
             _ => Ok(None),

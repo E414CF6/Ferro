@@ -76,6 +76,8 @@ impl<B> OnResponse<B> for CustomOnResponse {
         let status = response.status();
         let latency_ms = latency.as_secs_f64() * 1000.0;
 
+        crate::infrastructure::metrics::HTTP_METRICS.record(status.as_u16(), latency);
+
         let req_id = response
             .headers()
             .get(REQUEST_ID_HEADER)

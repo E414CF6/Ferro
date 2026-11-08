@@ -49,7 +49,7 @@ impl StoryGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let user = db.get_user_by_id(self.0.author_id).await.ok_or_else(|| {
+            let user = db.get_user_by_id(self.0.author_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::StoryAuthorNotFound, "Story author not found").extend()
             })?;
             Ok(UserGql(user))
@@ -88,7 +88,7 @@ impl StoryGql {
         }
 
         let db = ctx.data::<Database>()?;
-        let viewers = db.get_story_viewers(self.0.id).await;
+        let viewers = db.get_story_viewers(self.0.id).await?;
         Ok(viewers.into_iter().map(UserGql).collect())
     }
 }

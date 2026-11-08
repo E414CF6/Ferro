@@ -20,11 +20,11 @@ impl CommentRepository for Database {
     ) -> Result<Comment, DomainError> {
         let _ = self
             .get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))?;
 
         if let Some(pid) = parent_id {
-            let parent = self.get_comment_by_id(pid).await.ok_or_else(|| {
+            let parent = self.get_comment_by_id(pid).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::ParentCommentNotFound, "Parent comment not found")
             })?;
             if parent.post_id != post_id {
@@ -103,7 +103,7 @@ impl CommentRepository for Database {
         }
 
         self.get_comment_by_id(comment_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))
     }
 
@@ -129,41 +129,52 @@ impl CommentRepository for Database {
         }
     }
 
-    async fn get_comment_by_id(&self, comment_id: Uuid) -> Option<Comment> {
+    async fn get_comment_by_id(&self, comment_id: Uuid) -> Result<Option<Comment>, DomainError> {
         let entity: Option<CommentEntity> = db_fetch_optional!(
             self,
             CommentEntity,
             "SELECT * FROM comments WHERE id = $1",
             comment_id
         )
-        .ok()
-        .flatten();
+        .map_err(|e| {
+            error!(target: "serve::comment_repo", error = %e, comment_id = %comment_id, "Failed to get comment by id");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get comment by id")
+        })?;
 
-        entity.map(Comment::from)
+        Ok(entity.map(Comment::from))
     }
 
-    async fn get_comments_for_post(&self, post_id: Uuid) -> Vec<Comment> {
+    async fn get_comments_for_post(&self, post_id: Uuid) -> Result<Vec<Comment>, DomainError> {
         let entities: Vec<CommentEntity> = db_fetch_all!(
             self,
             CommentEntity,
             "SELECT * FROM comments WHERE post_id = $1 ORDER BY created_at ASC, id ASC",
             post_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::comment_repo", error = %e, post_id = %post_id, "Failed to get comments for post");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get comments for post")
+        })?;
 
-        entities.into_iter().map(Comment::from).collect()
+        Ok(entities.into_iter().map(Comment::from).collect())
     }
 
-    async fn get_top_level_comments_for_post(&self, post_id: Uuid) -> Vec<Comment> {
+    async fn get_top_level_comments_for_post(
+        &self,
+        post_id: Uuid,
+    ) -> Result<Vec<Comment>, DomainError> {
         let entities: Vec<CommentEntity> = db_fetch_all!(
             self,
             CommentEntity,
             "SELECT * FROM comments WHERE post_id = $1 AND parent_id IS NULL ORDER BY created_at ASC, id ASC",
             post_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::comment_repo", error = %e, post_id = %post_id, "Failed to get top-level comments for post");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get top-level comments for post")
+        })?;
 
-        entities.into_iter().map(Comment::from).collect()
+        Ok(entities.into_iter().map(Comment::from).collect())
     }
 
     async fn get_comments_cursor(
@@ -172,7 +183,7 @@ impl CommentRepository for Database {
         top_level_only: bool,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Comment>, bool) {
+    ) -> Result<(Vec<Comment>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<CommentEntity> = match (top_level_only, after) {
             (true, Some((after_time, after_id))) => db_fetch_all!(
@@ -222,7 +233,10 @@ impl CommentRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::comment_repo", error = %e, post_id = %post_id, "Failed to get comments cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get comments cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Comment> = entities
@@ -230,19 +244,22 @@ impl CommentRepository for Database {
             .take(first)
             .map(Comment::from)
             .collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
-    async fn get_replies_for_comment(&self, comment_id: Uuid) -> Vec<Comment> {
+    async fn get_replies_for_comment(&self, comment_id: Uuid) -> Result<Vec<Comment>, DomainError> {
         let entities: Vec<CommentEntity> = db_fetch_all!(
             self,
             CommentEntity,
             "SELECT * FROM comments WHERE parent_id = $1 ORDER BY created_at ASC, id ASC",
             comment_id
         )
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::comment_repo", error = %e, comment_id = %comment_id, "Failed to get replies for comment");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get replies for comment")
+        })?;
 
-        entities.into_iter().map(Comment::from).collect()
+        Ok(entities.into_iter().map(Comment::from).collect())
     }
 
     async fn get_replies_cursor(
@@ -250,7 +267,7 @@ impl CommentRepository for Database {
         comment_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Comment>, bool) {
+    ) -> Result<(Vec<Comment>, bool), DomainError> {
         let fetch_limit = (first + 1) as i64;
         let entities: Vec<CommentEntity> = match after {
             Some((after_time, after_id)) => db_fetch_all!(
@@ -277,7 +294,10 @@ impl CommentRepository for Database {
                 fetch_limit
             ),
         }
-        .unwrap_or_default();
+        .map_err(|e| {
+            error!(target: "serve::comment_repo", error = %e, comment_id = %comment_id, "Failed to get replies cursor");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get replies cursor")
+        })?;
 
         let has_next_page = entities.len() > first;
         let items: Vec<Comment> = entities
@@ -285,7 +305,7 @@ impl CommentRepository for Database {
             .take(first)
             .map(Comment::from)
             .collect();
-        (items, has_next_page)
+        Ok((items, has_next_page))
     }
 
     async fn get_replies_count(&self, comment_id: Uuid) -> usize {
@@ -301,7 +321,7 @@ impl CommentRepository for Database {
     async fn like_comment(&self, user_id: Uuid, comment_id: Uuid) -> Result<Comment, DomainError> {
         let comment = self
             .get_comment_by_id(comment_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
 
         let _ = db_execute!(
@@ -322,7 +342,7 @@ impl CommentRepository for Database {
     ) -> Result<Comment, DomainError> {
         let comment = self
             .get_comment_by_id(comment_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
 
         let _ = db_execute!(
@@ -364,7 +384,7 @@ impl CommentRepository for Database {
     ) -> Result<Post, DomainError> {
         let comment = self
             .get_comment_by_id(comment_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::CommentNotFound, "Comment not found"))?;
 
         if comment.post_id != post_id {
@@ -394,7 +414,7 @@ impl CommentRepository for Database {
         }
 
         self.get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))
     }
 
@@ -418,13 +438,15 @@ impl CommentRepository for Database {
         }
 
         self.get_post_by_id(post_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::PostNotFound, "Post not found"))
     }
 
-    async fn get_pinned_comment(&self, post_id: Uuid) -> Option<Comment> {
+    async fn get_pinned_comment(&self, post_id: Uuid) -> Result<Option<Comment>, DomainError> {
         let post = self.get_post_by_id(post_id).await?;
-        let pinned_id = post.pinned_comment_id?;
-        self.get_comment_by_id(pinned_id).await
+        match post.and_then(|p| p.pinned_comment_id) {
+            Some(pinned_id) => self.get_comment_by_id(pinned_id).await,
+            None => Ok(None),
+        }
     }
 }

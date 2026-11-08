@@ -1,11 +1,10 @@
+use crate::application::AppServices;
 use crate::application::helpers::require_auth;
-use crate::domain::repositories::DmRepository;
 use crate::graphql::types::{
     ConversationGql, DirectMessageConnectionGql, DirectMessageEdgeGql, DirectMessageGql,
     GroupConversationGql, PageInfoGql, decode_cursor, encode_cursor,
 };
-use crate::infrastructure::db::postgres::Database;
-use async_graphql::{Context, ID, Object, Result};
+use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -16,8 +15,12 @@ impl DmQuery {
     /// Get conversation summaries for current user
     async fn conversations(&self, ctx: &Context<'_>) -> Result<Vec<ConversationGql>> {
         let uid = require_auth(ctx)?;
-        let db = ctx.data::<Database>()?;
-        let convos = db.get_conversations(uid).await;
+        let services = ctx.data::<AppServices>()?;
+        let convos = services
+            .dm
+            .get_conversations(uid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(convos.into_iter().map(ConversationGql).collect())
     }
 
@@ -31,8 +34,12 @@ impl DmQuery {
     ) -> Result<Vec<DirectMessageGql>> {
         let uid = require_auth(ctx)?;
         let other_id = Uuid::parse_str(&other_user_id)?;
-        let db = ctx.data::<Database>()?;
-        let msgs = db.get_direct_messages(uid, other_id, limit, offset).await;
+        let services = ctx.data::<AppServices>()?;
+        let msgs = services
+            .dm
+            .get_direct_messages(uid, other_id, limit, offset)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(msgs.into_iter().map(DirectMessageGql).collect())
     }
 
@@ -46,7 +53,7 @@ impl DmQuery {
     ) -> Result<DirectMessageConnectionGql> {
         let uid = require_auth(ctx)?;
         let other_id = Uuid::parse_str(&other_user_id)?;
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -54,9 +61,11 @@ impl DmQuery {
             None
         };
 
-        let (msgs, has_next_page) = db
+        let (msgs, has_next_page) = services
+            .dm
             .get_direct_messages_cursor(uid, other_id, page_size, cursor_pair)
-            .await;
+            .await
+            .map_err(|e| e.extend())?;
         let start_cursor = msgs.first().map(|m| encode_cursor(m.created_at, m.id));
         let end_cursor = msgs.last().map(|m| encode_cursor(m.created_at, m.id));
 
@@ -85,8 +94,12 @@ impl DmQuery {
     /// Get group conversations the current user belongs to
     async fn group_conversations(&self, ctx: &Context<'_>) -> Result<Vec<GroupConversationGql>> {
         let uid = require_auth(ctx)?;
-        let db = ctx.data::<Database>()?;
-        let convos = db.get_user_group_conversations(uid).await;
+        let services = ctx.data::<AppServices>()?;
+        let convos = services
+            .dm
+            .get_user_group_conversations(uid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(convos.into_iter().map(GroupConversationGql).collect())
     }
 
@@ -98,17 +111,19 @@ impl DmQuery {
     ) -> Result<Option<GroupConversationGql>> {
         let _ = require_auth(ctx)?;
         let cid = Uuid::parse_str(&id)?;
-        let db = ctx.data::<Database>()?;
-        Ok(db
+        let services = ctx.data::<AppServices>()?;
+        let convo = services
+            .dm
             .get_conversation_by_id(cid)
             .await
-            .map(GroupConversationGql))
+            .map_err(|e| e.extend())?;
+        Ok(convo.map(GroupConversationGql))
     }
 
     /// Get total unread direct message count for current user
     async fn unread_dm_count(&self, ctx: &Context<'_>) -> Result<usize> {
         let uid = require_auth(ctx)?;
-        let db = ctx.data::<Database>()?;
-        Ok(db.get_unread_dm_count(uid).await)
+        let services = ctx.data::<AppServices>()?;
+        Ok(services.dm.get_unread_dm_count(uid).await)
     }
 }

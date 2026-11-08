@@ -75,4 +75,6 @@ async fn test_health_liveness_endpoints() {
     let text_metrics = String::from_utf8(body_metrics.to_vec()).unwrap();
     assert!(text_metrics.contains("ferro_db_pool_connections_total"));
     assert!(text_metrics.contains("ferro_serve_info"));
+    assert!(text_metrics.contains("ferro_http_requests_total"));
+    assert!(text_metrics.contains("ferro_http_request_duration_seconds_total"));
 }

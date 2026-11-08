@@ -446,14 +446,18 @@ impl Database {
 
     pub async fn seed_wiki_data(&self, now: DateTime<Utc>) -> Result<(), DomainError> {
         let wiki_count: i64 = match &self.backend {
-            DatabaseBackend::Postgres(pool) => sqlx::query_scalar("SELECT COUNT(*) FROM wiki_articles")
-                .fetch_one(pool)
-                .await
-                .unwrap_or(0),
-            DatabaseBackend::Sqlite(pool) => sqlx::query_scalar("SELECT COUNT(*) FROM wiki_articles")
-                .fetch_one(pool)
-                .await
-                .unwrap_or(0),
+            DatabaseBackend::Postgres(pool) => {
+                sqlx::query_scalar("SELECT COUNT(*) FROM wiki_articles")
+                    .fetch_one(pool)
+                    .await
+                    .unwrap_or(0)
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                sqlx::query_scalar("SELECT COUNT(*) FROM wiki_articles")
+                    .fetch_one(pool)
+                    .await
+                    .unwrap_or(0)
+            }
         };
 
         if wiki_count > 0 {
@@ -544,7 +548,9 @@ impl Database {
             ),
         ];
 
-        for (idx, (title, slug, summary, content, lat, lng, zoom, cat, tags, author, views)) in articles.iter().enumerate() {
+        for (idx, (title, slug, summary, content, lat, lng, zoom, cat, tags, author, views)) in
+            articles.iter().enumerate()
+        {
             let art_id = Uuid::new_v4();
             let rev_id = Uuid::new_v4();
 

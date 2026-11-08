@@ -11,7 +11,7 @@ use crate::infrastructure::db::loaders::{
 };
 use crate::infrastructure::db::postgres::Database;
 
-use super::{decode_cursor, encode_cursor, PageInfoGql, PostGql, UserGql};
+use super::{PageInfoGql, PostGql, UserGql, decode_cursor, encode_cursor};
 
 #[derive(Clone)]
 pub struct CommentGql(pub CommentModel);
@@ -52,7 +52,7 @@ impl CommentGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let user = db.get_user_by_id(self.0.author_id).await.ok_or_else(|| {
+            let user = db.get_user_by_id(self.0.author_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::CommentAuthorNotFound, "Comment author not found")
                     .extend()
             })?;
@@ -68,7 +68,7 @@ impl CommentGql {
             Ok(PostGql(post))
         } else {
             let db = ctx.data::<Database>()?;
-            let post = db.get_post_by_id(self.0.post_id).await.ok_or_else(|| {
+            let post = db.get_post_by_id(self.0.post_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::PostNotFound, "Post not found").extend()
             })?;
             Ok(PostGql(post))
@@ -84,7 +84,7 @@ impl CommentGql {
             Ok(comment_opt.map(CommentGql))
         } else {
             let db = ctx.data::<Database>()?;
-            Ok(db.get_comment_by_id(pid).await.map(CommentGql))
+            Ok(db.get_comment_by_id(pid).await?.map(CommentGql))
         }
     }
 
@@ -98,7 +98,7 @@ impl CommentGql {
             if depth > 20 {
                 break;
             }
-            if let Some(parent) = db.get_comment_by_id(pid).await {
+            if let Ok(Some(parent)) = db.get_comment_by_id(pid).await {
                 curr_parent = parent.parent_id;
             } else {
                 break;
@@ -116,7 +116,7 @@ impl CommentGql {
         let mut root = None;
         let mut depth = 0;
         while depth < 20 {
-            if let Some(parent) = db.get_comment_by_id(pid).await {
+            if let Ok(Some(parent)) = db.get_comment_by_id(pid).await {
                 if let Some(next_pid) = parent.parent_id {
                     pid = next_pid;
                     depth += 1;
@@ -133,7 +133,7 @@ impl CommentGql {
 
     async fn replies(&self, ctx: &Context<'_>) -> Result<Vec<CommentGql>> {
         let db = ctx.data::<Database>()?;
-        let replies = db.get_replies_for_comment(self.0.id).await;
+        let replies = db.get_replies_for_comment(self.0.id).await?;
         Ok(replies.into_iter().map(CommentGql).collect())
     }
 
@@ -154,7 +154,7 @@ impl CommentGql {
 
         let (replies, has_next_page) = db
             .get_replies_cursor(self.0.id, page_size, cursor_pair)
-            .await;
+            .await?;
         let start_cursor = replies.first().map(|c| encode_cursor(c.created_at, c.id));
         let end_cursor = replies.last().map(|c| encode_cursor(c.created_at, c.id));
 

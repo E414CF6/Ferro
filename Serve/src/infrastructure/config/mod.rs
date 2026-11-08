@@ -262,9 +262,12 @@ impl Default for StorageConfig {
 
 /// Authentication and JWT security configuration
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AuthConfig {
     pub jwt_secret: String,
     pub jwt_expiration_days: i64,
+    pub access_token_expiration_minutes: i64,
+    pub refresh_token_expiration_days: i64,
 }
 
 impl Default for AuthConfig {
@@ -273,6 +276,43 @@ impl Default for AuthConfig {
             jwt_secret: "ferro-development-secret-key-do-not-use-in-production-32bytes!"
                 .to_string(),
             jwt_expiration_days: 30,
+            access_token_expiration_minutes: 15,
+            refresh_token_expiration_days: 30,
+        }
+    }
+}
+
+/// PubSub engine driver selection
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PubSubDriver {
+    #[default]
+    InMemory,
+    Redis,
+}
+
+impl FromStr for PubSubDriver {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "redis" => Ok(PubSubDriver::Redis),
+            _ => Ok(PubSubDriver::InMemory),
+        }
+    }
+}
+
+/// Redis infrastructure configuration
+#[derive(Debug, Clone)]
+pub struct RedisConfig {
+    pub enabled: bool,
+    pub url: String,
+}
+
+impl Default for RedisConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            url: "redis://127.0.0.1:6379".to_string(),
         }
     }
 }
@@ -345,6 +385,8 @@ pub struct AppConfig {
     pub rate_limit: RateLimitConfig,
     pub cors: CorsConfig,
     pub logging: LoggingConfig,
+    pub redis: RedisConfig,
+    pub pubsub_driver: PubSubDriver,
 }
 
 impl AppConfig {
@@ -509,7 +551,9 @@ impl AppConfig {
             "ferro-development-secret-key-do-not-use-in-production-32bytes!".to_string()
         });
 
-        if env.is_production() && (jwt_secret.contains("development") || jwt_secret.len() < 32 || jwt_secret == "PROD") {
+        if env.is_production()
+            && (jwt_secret.contains("development") || jwt_secret.len() < 32 || jwt_secret == "PROD")
+        {
             warn!(
                 target: "serve::config",
                 "SECURITY WARNING: Default, short, or weak JWT_SECRET is being used in PRODUCTION! Please set a strong random JWT_SECRET (at least 32 characters)."
@@ -521,9 +565,21 @@ impl AppConfig {
             .and_then(|v| v.parse().ok())
             .unwrap_or(30);
 
+        let access_token_expiration_minutes: i64 = env::var("JWT_ACCESS_EXPIRATION_MINUTES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(15);
+
+        let refresh_token_expiration_days: i64 = env::var("JWT_REFRESH_EXPIRATION_DAYS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(30);
+
         let auth = AuthConfig {
             jwt_secret,
             jwt_expiration_days,
+            access_token_expiration_minutes,
+            refresh_token_expiration_days,
         };
 
         let rate_limit_max: usize = env::var("RATE_LIMIT_MAX_REQUESTS")
@@ -568,6 +624,27 @@ impl AppConfig {
             filter: logging_filter,
         };
 
+        let redis_url =
+            env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+        let redis_enabled = env::var("REDIS_ENABLED")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or_else(|_| env::var("REDIS_URL").is_ok());
+
+        let redis = RedisConfig {
+            enabled: redis_enabled,
+            url: redis_url,
+        };
+
+        let default_driver = if redis.enabled {
+            PubSubDriver::Redis
+        } else {
+            PubSubDriver::InMemory
+        };
+        let pubsub_driver = env::var("PUBSUB_DRIVER")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default_driver);
+
         Self {
             server,
             database,
@@ -576,6 +653,8 @@ impl AppConfig {
             rate_limit,
             cors,
             logging,
+            redis,
+            pubsub_driver,
         }
     }
 
@@ -597,6 +676,8 @@ impl AppConfig {
             rate_limit_enabled = %self.rate_limit.enabled,
             rate_limit = %format!("{}/{}s (trust_proxy: {})", self.rate_limit.max_requests, self.rate_limit.window_secs, self.rate_limit.trust_proxy),
             metrics_protected = %self.server.metrics_token.is_some(),
+            redis_enabled = %self.redis.enabled,
+            pubsub_driver = ?self.pubsub_driver,
             "Application configuration initialized"
         );
     }

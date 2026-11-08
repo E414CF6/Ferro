@@ -52,7 +52,10 @@ impl<R: CommentRepository> CommentService<R> {
         self.repo.delete_comment(comment_id, author_id).await
     }
 
-    pub async fn get_comment_by_id(&self, comment_id: Uuid) -> Option<Comment> {
+    pub async fn get_comment_by_id(
+        &self,
+        comment_id: Uuid,
+    ) -> Result<Option<Comment>, DomainError> {
         self.repo.get_comment_by_id(comment_id).await
     }
 
@@ -62,7 +65,7 @@ impl<R: CommentRepository> CommentService<R> {
         top_level_only: bool,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Comment>, bool) {
+    ) -> Result<(Vec<Comment>, bool), DomainError> {
         self.repo
             .get_comments_cursor(post_id, top_level_only, first, after)
             .await
@@ -73,8 +76,16 @@ impl<R: CommentRepository> CommentService<R> {
         comment_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Comment>, bool) {
+    ) -> Result<(Vec<Comment>, bool), DomainError> {
         self.repo.get_replies_cursor(comment_id, first, after).await
+    }
+
+    pub async fn get_comments_for_post(&self, post_id: Uuid) -> Result<Vec<Comment>, DomainError> {
+        self.repo.get_comments_for_post(post_id).await
+    }
+
+    pub async fn get_pinned_comment(&self, post_id: Uuid) -> Result<Option<Comment>, DomainError> {
+        self.repo.get_pinned_comment(post_id).await
     }
 
     pub async fn like_comment(

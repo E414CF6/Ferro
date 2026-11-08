@@ -921,15 +921,13 @@ impl Loader<Uuid> for WikiRevisionsLoader {
         }
 
         let entities: Vec<WikiRevisionEntity> = match self.db.backend() {
-            DatabaseBackend::Postgres(pool) => {
-                sqlx::query_as::<_, WikiRevisionEntity>(
-                    "SELECT * FROM wiki_revisions WHERE article_id = ANY($1) ORDER BY created_at DESC",
-                )
-                .bind(keys)
-                .fetch_all(pool)
-                .await
-                .map_err(Arc::new)?
-            }
+            DatabaseBackend::Postgres(pool) => sqlx::query_as::<_, WikiRevisionEntity>(
+                "SELECT * FROM wiki_revisions WHERE article_id = ANY($1) ORDER BY created_at DESC",
+            )
+            .bind(keys)
+            .fetch_all(pool)
+            .await
+            .map_err(Arc::new)?,
             DatabaseBackend::Sqlite(pool) => {
                 let sql = sqlite_in(
                     "SELECT * FROM wiki_revisions",
@@ -937,7 +935,8 @@ impl Loader<Uuid> for WikiRevisionsLoader {
                     keys.len(),
                     "ORDER BY created_at DESC",
                 );
-                let mut query = sqlx::query_as::<_, WikiRevisionEntity>(AssertSqlSafe(sql.as_str()));
+                let mut query =
+                    sqlx::query_as::<_, WikiRevisionEntity>(AssertSqlSafe(sql.as_str()));
                 for k in keys {
                     query = query.bind(k);
                 }
@@ -1261,5 +1260,3 @@ impl Loader<(Uuid, Uuid)> for HasPendingFollowRequestLoader {
         Ok(map)
     }
 }
-
-

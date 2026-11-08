@@ -16,6 +16,9 @@ fn test_default_config() {
     assert_eq!(config.database.min_connections, 1);
     assert!(config.database.auto_migrate);
     assert_eq!(config.auth.jwt_expiration_days, 30);
+    assert_eq!(config.auth.access_token_expiration_minutes, 15);
+    assert_eq!(config.auth.refresh_token_expiration_days, 30);
+    assert!(!config.redis.enabled);
     assert_eq!(config.storage.driver, StorageDriver::Local);
     assert_eq!(config.storage.local_path, "./uploads");
     assert!(config.cors.allows_any());

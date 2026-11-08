@@ -8,7 +8,7 @@ use crate::infrastructure::db::loaders::UserLoader;
 use crate::infrastructure::db::postgres::Database;
 
 use super::{
-    decode_cursor, encode_cursor, PageInfoGql, PostConnectionGql, PostEdgeGql, PostGql, UserGql,
+    PageInfoGql, PostConnectionGql, PostEdgeGql, PostGql, UserGql, decode_cursor, encode_cursor,
 };
 
 #[derive(Clone)]
@@ -40,7 +40,7 @@ impl BookmarkCollectionGql {
             Ok(UserGql(user))
         } else {
             let db = ctx.data::<Database>()?;
-            let user = db.get_user_by_id(self.0.user_id).await.ok_or_else(|| {
+            let user = db.get_user_by_id(self.0.user_id).await?.ok_or_else(|| {
                 DomainError::new(ErrorCode::UserNotFound, "User not found").extend()
             })?;
             Ok(UserGql(user))
@@ -63,7 +63,7 @@ impl BookmarkCollectionGql {
 
         let (posts, has_next_page) = db
             .get_collection_posts_cursor(self.0.id, page_size, cursor_pair)
-            .await;
+            .await?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 

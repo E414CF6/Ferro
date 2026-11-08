@@ -26,15 +26,21 @@ impl<R: StoryRepository> StoryService<R> {
         self.repo.create_story(author_id, media_url, caption).await
     }
 
-    pub async fn get_story_by_id(&self, story_id: Uuid) -> Option<Story> {
+    pub async fn get_story_by_id(&self, story_id: Uuid) -> Result<Option<Story>, DomainError> {
         self.repo.get_story_by_id(story_id).await
     }
 
-    pub async fn get_active_stories_for_user(&self, author_id: Uuid) -> Vec<Story> {
+    pub async fn get_active_stories_for_user(
+        &self,
+        author_id: Uuid,
+    ) -> Result<Vec<Story>, DomainError> {
         self.repo.get_active_stories_for_user(author_id).await
     }
 
-    pub async fn get_stories_feed_for_user(&self, user_id: Uuid) -> Vec<Story> {
+    pub async fn get_stories_feed_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<Story>, DomainError> {
         self.repo.get_stories_feed_for_user(user_id).await
     }
 
@@ -46,11 +52,16 @@ impl<R: StoryRepository> StoryService<R> {
         self.repo.view_story(story_id, viewer_id).await
     }
 
-    pub async fn get_story_viewers(&self, story_id: Uuid) -> Vec<User> {
+    pub async fn get_story_viewers(&self, story_id: Uuid) -> Result<Vec<User>, DomainError> {
         self.repo.get_story_viewers(story_id).await
     }
 
     pub async fn has_active_stories(&self, author_id: Uuid) -> bool {
         self.repo.has_active_stories(author_id).await
+    }
+
+    pub async fn prune_expired_stories(&self, retention_days: i64) -> Result<u64, DomainError> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(retention_days);
+        self.repo.prune_expired_stories(cutoff).await
     }
 }

@@ -253,11 +253,21 @@ pub struct TrendsDataGql(pub TrendsData);
 #[Object]
 impl TrendsDataGql {
     async fn articles(&self) -> Vec<TrendingArticleItemGql> {
-        self.0.articles.iter().cloned().map(TrendingArticleItemGql).collect()
+        self.0
+            .articles
+            .iter()
+            .cloned()
+            .map(TrendingArticleItemGql)
+            .collect()
     }
 
     async fn tags(&self) -> Vec<TrendingTagItemGql> {
-        self.0.tags.iter().cloned().map(TrendingTagItemGql).collect()
+        self.0
+            .tags
+            .iter()
+            .cloned()
+            .map(TrendingTagItemGql)
+            .collect()
     }
 
     async fn updated_at(&self) -> DateTime<Utc> {

@@ -1,7 +1,6 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
-use crate::domain::repositories::BookmarkRepository;
 use crate::graphql::types::BookmarkCollectionGql;
-use crate::infrastructure::db::postgres::Database;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
 
@@ -20,8 +19,9 @@ impl BookmarkMutation {
         user_id: Option<ID>,
     ) -> Result<BookmarkCollectionGql> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
-        let coll = db
+        let services = ctx.data::<AppServices>()?;
+        let coll = services
+            .bookmark
             .create_bookmark_collection(uid, name, description, is_private.unwrap_or(true))
             .await
             .map_err(|e| e.extend())?;
@@ -40,8 +40,9 @@ impl BookmarkMutation {
     ) -> Result<BookmarkCollectionGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let cid = Uuid::parse_str(&collection_id)?;
-        let db = ctx.data::<Database>()?;
-        let coll = db
+        let services = ctx.data::<AppServices>()?;
+        let coll = services
+            .bookmark
             .update_bookmark_collection(cid, uid, name, description, is_private)
             .await
             .map_err(|e| e.extend())?;
@@ -57,8 +58,10 @@ impl BookmarkMutation {
     ) -> Result<bool> {
         let uid = resolve_user_id(ctx, user_id)?;
         let cid = Uuid::parse_str(&collection_id)?;
-        let db = ctx.data::<Database>()?;
-        db.delete_bookmark_collection(cid, uid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .bookmark
+            .delete_bookmark_collection(cid, uid)
             .await
             .map_err(|e| e.extend())
     }
@@ -74,8 +77,10 @@ impl BookmarkMutation {
         let uid = resolve_user_id(ctx, user_id)?;
         let cid = Uuid::parse_str(&collection_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        db.add_post_to_collection(cid, uid, pid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .bookmark
+            .add_post_to_collection(cid, uid, pid)
             .await
             .map_err(|e| e.extend())
     }
@@ -91,8 +96,10 @@ impl BookmarkMutation {
         let uid = resolve_user_id(ctx, user_id)?;
         let cid = Uuid::parse_str(&collection_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        db.remove_post_from_collection(cid, uid, pid)
+        let services = ctx.data::<AppServices>()?;
+        services
+            .bookmark
+            .remove_post_from_collection(cid, uid, pid)
             .await
             .map_err(|e| e.extend())
     }

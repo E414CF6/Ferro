@@ -1,8 +1,7 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
 use crate::domain::models::{ReportReason, ReportStatus, ReportTargetType};
-use crate::domain::repositories::ModerationRepository;
 use crate::graphql::types::{ReportGql, ReportReasonGql, ReportStatusGql, ReportTargetTypeGql};
-use crate::infrastructure::db::postgres::Database;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
 
@@ -23,8 +22,9 @@ impl ModerationMutation {
     ) -> Result<ReportGql> {
         let rid = resolve_user_id(ctx, reporter_id)?;
         let tid = Uuid::parse_str(&target_id)?;
-        let db = ctx.data::<Database>()?;
-        let report = db
+        let services = ctx.data::<AppServices>()?;
+        let report = services
+            .moderation
             .create_report(
                 rid,
                 ReportTargetType::from(target_type),
@@ -45,8 +45,9 @@ impl ModerationMutation {
         status: ReportStatusGql,
     ) -> Result<ReportGql> {
         let rid = Uuid::parse_str(&report_id)?;
-        let db = ctx.data::<Database>()?;
-        let report = db
+        let services = ctx.data::<AppServices>()?;
+        let report = services
+            .moderation
             .resolve_report(rid, ReportStatus::from(status))
             .await
             .map_err(|e| e.extend())?;

@@ -27,14 +27,22 @@ impl WikiQuery {
             limit: filter_input.limit,
         };
 
-        let articles = services.wiki.get_articles(&params).await.map_err(|e| e.extend())?;
+        let articles = services
+            .wiki
+            .get_articles(&params)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(articles.into_iter().map(WikiArticleGql).collect())
     }
 
     /// Retrieve a specific wiki article by its URL slug
     async fn article(&self, ctx: &Context<'_>, slug: String) -> Result<Option<WikiArticleGql>> {
         let services = ctx.data::<AppServices>()?;
-        let article = services.wiki.get_article_by_slug(&slug).await.map_err(|e| e.extend())?;
+        let article = services
+            .wiki
+            .get_article_by_slug(&slug)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(article.map(WikiArticleGql))
     }
 

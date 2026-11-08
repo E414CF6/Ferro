@@ -19,14 +19,14 @@ pub trait NotificationRepository: Send + Sync {
         user_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<Notification>;
+    ) -> Result<Vec<Notification>, DomainError>;
 
     async fn get_notifications_cursor(
         &self,
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Notification>, bool);
+    ) -> Result<(Vec<Notification>, bool), DomainError>;
 
     async fn get_unread_notifications_count(&self, user_id: Uuid) -> usize;
 

@@ -16,13 +16,13 @@ pub trait BookmarkRepository: Send + Sync {
         user_id: Uuid,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Vec<Post>;
+    ) -> Result<Vec<Post>, DomainError>;
     async fn get_saved_posts_cursor(
         &self,
         user_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool);
+    ) -> Result<(Vec<Post>, bool), DomainError>;
 
     // Bookmark collections
     async fn create_bookmark_collection(
@@ -57,12 +57,18 @@ pub trait BookmarkRepository: Send + Sync {
         user_id: Uuid,
         post_id: Uuid,
     ) -> Result<bool, DomainError>;
-    async fn get_user_collections(&self, user_id: Uuid) -> Vec<BookmarkCollection>;
-    async fn get_collection_by_id(&self, collection_id: Uuid) -> Option<BookmarkCollection>;
+    async fn get_user_collections(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Vec<BookmarkCollection>, DomainError>;
+    async fn get_collection_by_id(
+        &self,
+        collection_id: Uuid,
+    ) -> Result<Option<BookmarkCollection>, DomainError>;
     async fn get_collection_posts_cursor(
         &self,
         collection_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<Post>, bool);
+    ) -> Result<(Vec<Post>, bool), DomainError>;
 }

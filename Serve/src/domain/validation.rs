@@ -178,4 +178,3 @@ pub fn validate_wiki_article(
 
     Ok(())
 }
-

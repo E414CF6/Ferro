@@ -356,3 +356,18 @@ CREATE INDEX IF NOT EXISTS idx_wiki_revisions_created_at ON wiki_revisions (crea
 CREATE INDEX IF NOT EXISTS idx_wiki_view_logs_article_created ON wiki_view_logs (article_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_wiki_view_logs_created_at ON wiki_view_logs (created_at);
 
+-- Refresh Tokens and Session Management
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    jti TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens (token_hash);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_jti ON refresh_tokens (jti);
+
+

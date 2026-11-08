@@ -19,12 +19,16 @@ impl SocialService {
         Self { db }
     }
 
-    pub async fn get_user_by_id(&self, user_id: Uuid) -> Option<User> {
+    pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>, DomainError> {
         self.db.get_user_by_id(user_id).await
     }
 
-    pub async fn get_user_by_username(&self, username: &str) -> Option<User> {
+    pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
         self.db.get_user_by_username(username).await
+    }
+
+    pub async fn get_users(&self) -> Result<Vec<User>, DomainError> {
+        self.db.get_users().await
     }
 
     pub async fn update_user_profile(
@@ -60,12 +64,28 @@ impl SocialService {
         self.db.update_user_privacy(user_id, is_private).await
     }
 
+    pub async fn set_totp_secret(
+        &self,
+        user_id: Uuid,
+        secret: String,
+    ) -> Result<bool, DomainError> {
+        self.db.set_totp_secret(user_id, secret).await
+    }
+
+    pub async fn enable_2fa(&self, user_id: Uuid) -> Result<bool, DomainError> {
+        self.db.enable_2fa(user_id).await
+    }
+
+    pub async fn disable_2fa(&self, user_id: Uuid) -> Result<bool, DomainError> {
+        self.db.disable_2fa(user_id).await
+    }
+
     pub async fn follow_user(
         &self,
         follower_id: Uuid,
         followee_id: Uuid,
     ) -> Result<User, DomainError> {
-        let followee = self.db.get_user_by_id(followee_id).await.ok_or_else(|| {
+        let followee = self.db.get_user_by_id(followee_id).await?.ok_or_else(|| {
             DomainError::new(
                 crate::domain::errors::ErrorCode::UserNotFound,
                 "User not found",
@@ -91,11 +111,11 @@ impl SocialService {
         self.db.unfollow_user(follower_id, followee_id).await
     }
 
-    pub async fn get_followers(&self, user_id: Uuid) -> Vec<User> {
+    pub async fn get_followers(&self, user_id: Uuid) -> Result<Vec<User>, DomainError> {
         self.db.get_followers(user_id).await
     }
 
-    pub async fn get_following(&self, user_id: Uuid) -> Vec<User> {
+    pub async fn get_following(&self, user_id: Uuid) -> Result<Vec<User>, DomainError> {
         self.db.get_following(user_id).await
     }
 
@@ -113,6 +133,14 @@ impl SocialService {
         blocked_id: Uuid,
     ) -> Result<bool, DomainError> {
         self.db.unblock_user(blocker_id, blocked_id).await
+    }
+
+    pub async fn is_blocked_between(&self, user_a: Uuid, user_b: Uuid) -> bool {
+        self.db.is_blocked_between(user_a, user_b).await
+    }
+
+    pub async fn is_blocking(&self, blocker_id: Uuid, blocked_id: Uuid) -> bool {
+        self.db.is_blocking(blocker_id, blocked_id).await
     }
 
     pub async fn mute_user(&self, muter_id: Uuid, muted_id: Uuid) -> Result<bool, DomainError> {
@@ -147,8 +175,23 @@ impl SocialService {
         self.db.reject_follow_request(target_id, requester_id).await
     }
 
-    pub async fn get_pending_follow_requests(&self, target_id: Uuid) -> Vec<FollowRequest> {
+    pub async fn search_users(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<User>, DomainError> {
+        self.db.search_users(query, limit).await
+    }
+
+    pub async fn get_pending_follow_requests(
+        &self,
+        target_id: Uuid,
+    ) -> Result<Vec<FollowRequest>, DomainError> {
         self.db.get_pending_follow_requests(target_id).await
+    }
+
+    pub async fn get_pending_follow_requests_count(&self, target_id: Uuid) -> usize {
+        self.db.get_pending_follow_requests_count(target_id).await
     }
 
     // User Lists
@@ -206,15 +249,18 @@ impl SocialService {
             .await
     }
 
-    pub async fn get_user_lists(&self, user_id: Uuid) -> Vec<UserList> {
+    pub async fn get_user_lists(&self, user_id: Uuid) -> Result<Vec<UserList>, DomainError> {
         self.db.get_user_lists(user_id).await
     }
 
-    pub async fn get_user_list_by_id(&self, list_id: Uuid) -> Option<UserList> {
+    pub async fn get_user_list_by_id(
+        &self,
+        list_id: Uuid,
+    ) -> Result<Option<UserList>, DomainError> {
         self.db.get_user_list_by_id(list_id).await
     }
 
-    pub async fn get_list_members(&self, list_id: Uuid) -> Vec<User> {
+    pub async fn get_list_members(&self, list_id: Uuid) -> Result<Vec<User>, DomainError> {
         self.db.get_list_members(list_id).await
     }
 
@@ -223,7 +269,7 @@ impl SocialService {
         list_id: Uuid,
         first: usize,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> (Vec<crate::domain::models::Post>, bool) {
+    ) -> Result<(Vec<crate::domain::models::Post>, bool), DomainError> {
         self.db.get_list_feed_cursor(list_id, first, after).await
     }
 }

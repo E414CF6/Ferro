@@ -1,7 +1,6 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
-use crate::domain::repositories::StoryRepository;
 use crate::graphql::types::StoryGql;
-use crate::infrastructure::db::postgres::Database;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
 
@@ -19,8 +18,9 @@ impl StoryMutation {
         author_id: Option<ID>,
     ) -> Result<StoryGql> {
         let aid = resolve_user_id(ctx, author_id)?;
-        let db = ctx.data::<Database>()?;
-        let story = db
+        let services = ctx.data::<AppServices>()?;
+        let story = services
+            .story
             .create_story(aid, media_url, caption)
             .await
             .map_err(|e| e.extend())?;
@@ -36,8 +36,12 @@ impl StoryMutation {
     ) -> Result<bool> {
         let vid = resolve_user_id(ctx, viewer_id)?;
         let sid = Uuid::parse_str(&story_id)?;
-        let db = ctx.data::<Database>()?;
-        db.view_story(sid, vid).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .story
+            .view_story(sid, vid)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Delete a story
@@ -49,7 +53,11 @@ impl StoryMutation {
     ) -> Result<bool> {
         let aid = resolve_user_id(ctx, author_id)?;
         let sid = Uuid::parse_str(&story_id)?;
-        let db = ctx.data::<Database>()?;
-        db.delete_story(sid, aid).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .story
+            .delete_story(sid, aid)
+            .await
+            .map_err(|e| e.extend())
     }
 }

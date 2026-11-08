@@ -523,3 +523,15 @@ impl From<WikiViewLogEntity> for WikiViewLog {
     }
 }
 
+/// Database row entity for the `refresh_tokens` table.
+#[derive(Debug, Clone, FromRow)]
+#[allow(dead_code)]
+pub struct RefreshTokenEntity {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub token_hash: String,
+    pub jti: String,
+    pub expires_at: DateTime<Utc>,
+    pub revoked_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}

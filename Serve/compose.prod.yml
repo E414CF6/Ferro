@@ -17,8 +17,12 @@ services:
       - DB_MIN_CONNECTIONS=5
       - DB_AUTO_MIGRATE=true
       - DB_SEED_DATA=false
+      - REDIS_ENABLED=true
+      - REDIS_URL=redis://redis:6379
+      - PUBSUB_DRIVER=redis
       - JWT_SECRET=${JWT_SECRET:-generate-a-secure-random-secret-in-production-at-least-32-chars!}
-      - JWT_EXPIRATION_DAYS=30
+      - JWT_ACCESS_EXPIRATION_MINUTES=15
+      - JWT_REFRESH_EXPIRATION_DAYS=30
       - RATE_LIMIT_ENABLED=true
       - RATE_LIMIT_MAX_REQUESTS=120
       - RATE_LIMIT_WINDOW_SECS=60
@@ -28,6 +32,8 @@ services:
       - RUST_LOG=info,serve=info,tower_http=info,sqlx=warn
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - serve_uploads:/app/uploads
@@ -50,6 +56,21 @@ services:
       timeout: 3s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: serve-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    volumes:
+      - serve_redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   serve_pg_data:
+  serve_redis_data:
   serve_uploads:

@@ -1,11 +1,10 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
-use crate::domain::repositories::NotificationRepository;
 use crate::graphql::types::{
     NotificationConnectionGql, NotificationEdgeGql, NotificationGql, PageInfoGql, decode_cursor,
     encode_cursor,
 };
-use crate::infrastructure::db::postgres::Database;
-use async_graphql::{Context, ID, Object, Result};
+use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 
 #[derive(Default)]
 pub struct NotificationQuery;
@@ -21,7 +20,7 @@ impl NotificationQuery {
         after: Option<String>,
     ) -> Result<NotificationConnectionGql> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -29,10 +28,15 @@ impl NotificationQuery {
             None
         };
 
-        let (notifs, has_next_page) = db
+        let (notifs, has_next_page) = services
+            .notification
             .get_notifications_cursor(uid, page_size, cursor_pair)
+            .await
+            .map_err(|e| e.extend())?;
+        let unread_count = services
+            .notification
+            .get_unread_notifications_count(uid)
             .await;
-        let unread_count = db.get_unread_notifications_count(uid).await;
         let start_cursor = notifs.first().map(|n| encode_cursor(n.created_at, n.id));
         let end_cursor = notifs.last().map(|n| encode_cursor(n.created_at, n.id));
 
@@ -66,8 +70,11 @@ impl NotificationQuery {
         user_id: Option<ID>,
     ) -> Result<usize> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
-        Ok(db.get_unread_notifications_count(uid).await)
+        let services = ctx.data::<AppServices>()?;
+        Ok(services
+            .notification
+            .get_unread_notifications_count(uid)
+            .await)
     }
 
     /// Get recent notifications list
@@ -79,8 +86,12 @@ impl NotificationQuery {
         offset: Option<usize>,
     ) -> Result<Vec<NotificationGql>> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
-        let notifs = db.get_notifications(uid, limit, offset).await;
+        let services = ctx.data::<AppServices>()?;
+        let notifs = services
+            .notification
+            .get_notifications(uid, limit, offset)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(notifs.into_iter().map(NotificationGql).collect())
     }
 }

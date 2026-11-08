@@ -1,10 +1,9 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
-use crate::domain::repositories::{BookmarkRepository, PostRepository};
 use crate::graphql::types::{
     HashtagTrendGql, PageInfoGql, PostAnalyticsGql, PostConnectionGql, PostEdgeGql, PostGql,
     decode_cursor, encode_cursor,
 };
-use crate::infrastructure::db::postgres::Database;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use uuid::Uuid;
 
@@ -15,16 +14,26 @@ pub struct PostQuery;
 impl PostQuery {
     /// Get single post by ID
     async fn post(&self, ctx: &Context<'_>, id: ID) -> Result<Option<PostGql>> {
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let pid = Uuid::parse_str(&id)?;
-        Ok(db.get_post_by_id(pid).await.map(PostGql))
+        let post = services
+            .post
+            .get_post_by_id(pid)
+            .await
+            .map_err(|e| e.extend())?;
+        Ok(post.map(PostGql))
     }
 
-    /// Get post analytics and engagement metrics
+    /// Get post analytics and engagement metrics (strictly restricted to author)
     async fn post_analytics(&self, ctx: &Context<'_>, post_id: ID) -> Result<PostAnalyticsGql> {
-        let db = ctx.data::<Database>()?;
+        let auth_uid = crate::application::helpers::require_auth(ctx)?;
+        let services = ctx.data::<AppServices>()?;
         let pid = Uuid::parse_str(&post_id)?;
-        let an = db.get_post_analytics(pid).await.map_err(|e| e.extend())?;
+        let an = services
+            .post
+            .get_post_analytics(pid, auth_uid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(PostAnalyticsGql(an))
     }
 
@@ -35,8 +44,12 @@ impl PostQuery {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<Vec<PostGql>> {
-        let db = ctx.data::<Database>()?;
-        let posts = db.get_posts(limit, offset).await;
+        let services = ctx.data::<AppServices>()?;
+        let posts = services
+            .post
+            .get_posts(limit, offset)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(posts.into_iter().map(PostGql).collect())
     }
 
@@ -47,7 +60,7 @@ impl PostQuery {
         first: Option<usize>,
         after: Option<String>,
     ) -> Result<PostConnectionGql> {
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -55,7 +68,11 @@ impl PostQuery {
             None
         };
 
-        let (posts, has_next_page) = db.get_posts_cursor(page_size, cursor_pair).await;
+        let (posts, has_next_page) = services
+            .post
+            .get_posts_cursor(page_size, cursor_pair)
+            .await
+            .map_err(|e| e.extend())?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 
@@ -91,8 +108,12 @@ impl PostQuery {
         offset: Option<usize>,
     ) -> Result<Vec<PostGql>> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
-        let posts = db.get_feed(uid, limit, offset).await;
+        let services = ctx.data::<AppServices>()?;
+        let posts = services
+            .post
+            .get_feed(uid, limit, offset)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(posts.into_iter().map(PostGql).collect())
     }
 
@@ -105,7 +126,7 @@ impl PostQuery {
         after: Option<String>,
     ) -> Result<PostConnectionGql> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -113,7 +134,11 @@ impl PostQuery {
             None
         };
 
-        let (posts, has_next_page) = db.get_feed_cursor(uid, page_size, cursor_pair).await;
+        let (posts, has_next_page) = services
+            .post
+            .get_feed_cursor(uid, page_size, cursor_pair)
+            .await
+            .map_err(|e| e.extend())?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 
@@ -149,7 +174,7 @@ impl PostQuery {
         after: Option<String>,
     ) -> Result<PostConnectionGql> {
         let uid = resolve_user_id(ctx, user_id)?;
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -157,7 +182,11 @@ impl PostQuery {
             None
         };
 
-        let (posts, has_next_page) = db.get_saved_posts_cursor(uid, page_size, cursor_pair).await;
+        let (posts, has_next_page) = services
+            .bookmark
+            .get_saved_posts_cursor(uid, page_size, cursor_pair)
+            .await
+            .map_err(|e| e.extend())?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 
@@ -184,6 +213,18 @@ impl PostQuery {
         })
     }
 
+    /// Get posts saved / bookmarked by current user (flat list)
+    async fn saved_posts(&self, ctx: &Context<'_>, user_id: Option<ID>) -> Result<Vec<PostGql>> {
+        let uid = resolve_user_id(ctx, user_id)?;
+        let services = ctx.data::<AppServices>()?;
+        let (posts, _) = services
+            .bookmark
+            .get_saved_posts_cursor(uid, 50, None)
+            .await
+            .map_err(|e| e.extend())?;
+        Ok(posts.into_iter().map(PostGql).collect())
+    }
+
     /// Search posts containing full-text keyword with cursor pagination
     async fn search_posts_connection(
         &self,
@@ -192,7 +233,7 @@ impl PostQuery {
         first: Option<usize>,
         after: Option<String>,
     ) -> Result<PostConnectionGql> {
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -200,7 +241,11 @@ impl PostQuery {
             None
         };
 
-        let (posts, has_next_page) = db.search_posts_cursor(&query, page_size, cursor_pair).await;
+        let (posts, has_next_page) = services
+            .discovery
+            .search_posts_cursor(&query, page_size, cursor_pair)
+            .await
+            .map_err(|e| e.extend())?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 
@@ -235,7 +280,7 @@ impl PostQuery {
         first: Option<usize>,
         after: Option<String>,
     ) -> Result<PostConnectionGql> {
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let page_size = first.unwrap_or(20).clamp(1, 100);
         let cursor_pair = if let Some(ref a) = after {
             decode_cursor(a)
@@ -243,9 +288,11 @@ impl PostQuery {
             None
         };
 
-        let (posts, has_next_page) = db
+        let (posts, has_next_page) = services
+            .post
             .get_posts_by_hashtag_cursor(&hashtag, page_size, cursor_pair)
-            .await;
+            .await
+            .map_err(|e| e.extend())?;
         let start_cursor = posts.first().map(|p| encode_cursor(p.created_at, p.id));
         let end_cursor = posts.last().map(|p| encode_cursor(p.created_at, p.id));
 
@@ -278,8 +325,12 @@ impl PostQuery {
         ctx: &Context<'_>,
         limit: Option<usize>,
     ) -> Result<Vec<HashtagTrendGql>> {
-        let db = ctx.data::<Database>()?;
-        let list = db.get_trending_hashtags(limit).await;
+        let services = ctx.data::<AppServices>()?;
+        let list = services
+            .discovery
+            .get_trending_hashtags(limit)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(list
             .into_iter()
             .map(|(t, c)| HashtagTrendGql { tag: t, count: c })

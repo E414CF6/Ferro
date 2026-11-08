@@ -59,14 +59,10 @@ pub fn build_schema_with_options(
     let poll_options_loader = DataLoader::new(PollOptionsLoader::new(db.clone()), tokio::spawn);
     let poll_option_votes_loader =
         DataLoader::new(PollOptionVotesCountLoader::new(db.clone()), tokio::spawn);
-    let wiki_revisions_loader =
-        DataLoader::new(WikiRevisionsLoader::new(db.clone()), tokio::spawn);
-    let is_following_loader =
-        DataLoader::new(IsFollowingLoader::new(db.clone()), tokio::spawn);
-    let is_blocked_loader =
-        DataLoader::new(IsBlockedLoader::new(db.clone()), tokio::spawn);
-    let is_muted_loader =
-        DataLoader::new(IsMutedLoader::new(db.clone()), tokio::spawn);
+    let wiki_revisions_loader = DataLoader::new(WikiRevisionsLoader::new(db.clone()), tokio::spawn);
+    let is_following_loader = DataLoader::new(IsFollowingLoader::new(db.clone()), tokio::spawn);
+    let is_blocked_loader = DataLoader::new(IsBlockedLoader::new(db.clone()), tokio::spawn);
+    let is_muted_loader = DataLoader::new(IsMutedLoader::new(db.clone()), tokio::spawn);
     let has_pending_follow_request_loader =
         DataLoader::new(HasPendingFollowRequestLoader::new(db.clone()), tokio::spawn);
 

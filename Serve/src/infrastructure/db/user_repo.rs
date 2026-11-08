@@ -11,43 +11,50 @@ use uuid::Uuid;
 
 #[async_trait]
 impl UserRepository for Database {
-    async fn get_users(&self) -> Vec<User> {
-        db_fetch_all!(self, UserEntity, "SELECT * FROM users ORDER BY created_at")
-            .unwrap_or_default()
-            .into_iter()
-            .map(User::from)
-            .collect()
+    async fn get_users(&self) -> Result<Vec<User>, DomainError> {
+        let entities = db_fetch_all!(self, UserEntity, "SELECT * FROM users ORDER BY created_at")
+            .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, "Failed to get users");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get users")
+        })?;
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
-    async fn get_user_by_id(&self, id: Uuid) -> Option<User> {
-        db_fetch_optional!(self, UserEntity, "SELECT * FROM users WHERE id = $1", id)
-            .ok()
-            .flatten()
-            .map(User::from)
+    async fn get_user_by_id(&self, id: Uuid) -> Result<Option<User>, DomainError> {
+        let entity = db_fetch_optional!(self, UserEntity, "SELECT * FROM users WHERE id = $1", id)
+            .map_err(|e| {
+                error!(target: "serve::user_repo", error = %e, id = %id, "Failed to get user by id");
+                DomainError::new(ErrorCode::ErrorInternal, "Failed to get user by id")
+            })?;
+        Ok(entity.map(User::from))
     }
 
-    async fn get_user_by_username(&self, username: &str) -> Option<User> {
-        db_fetch_optional!(
+    async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
+        let entity = db_fetch_optional!(
             self,
             UserEntity,
             "SELECT * FROM users WHERE LOWER(username) = LOWER($1)",
             username
         )
-        .ok()
-        .flatten()
-        .map(User::from)
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, username = %username, "Failed to get user by username");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user by username")
+        })?;
+        Ok(entity.map(User::from))
     }
 
-    async fn get_user_by_identifier(&self, identifier: &str) -> Option<User> {
-        db_fetch_optional!(
+    async fn get_user_by_identifier(&self, identifier: &str) -> Result<Option<User>, DomainError> {
+        let entity = db_fetch_optional!(
             self,
             UserEntity,
             "SELECT * FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1)",
             identifier
         )
-        .ok()
-        .flatten()
-        .map(User::from)
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, identifier = %identifier, "Failed to get user by identifier");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get user by identifier")
+        })?;
+        Ok(entity.map(User::from))
     }
 
     async fn register_user(
@@ -124,18 +131,27 @@ impl UserRepository for Database {
         location: Option<String>,
         website: Option<String>,
     ) -> Result<User, DomainError> {
-        let mut user = self.get_user_by_id(id).await.ok_or_else(|| {
+        let mut user = self.get_user_by_id(id).await?.ok_or_else(|| {
             DomainError::new(ErrorCode::UserNotFound, ErrorCode::UserNotFound.as_str())
         })?;
 
         if let Some(ref uname) = username {
             let clean = uname.trim().to_lowercase();
-            if clean.len() < 3 || clean.len() > 30 || !clean.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                return Err(DomainError::new(ErrorCode::AuthInvalidUsername, "아이디는 3~30자의 영문, 숫자, 밑줄(_)만 가능합니다."));
+            if clean.len() < 3
+                || clean.len() > 30
+                || !clean.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
+                return Err(DomainError::new(
+                    ErrorCode::AuthInvalidUsername,
+                    "아이디는 3~30자의 영문, 숫자, 밑줄(_)만 가능합니다.",
+                ));
             }
-            if let Some(existing) = self.get_user_by_username(&clean).await {
+            if let Some(existing) = self.get_user_by_username(&clean).await? {
                 if existing.id != id {
-                    return Err(DomainError::new(ErrorCode::AuthUserAlreadyExists, "이미 사용 중인 아이디입니다."));
+                    return Err(DomainError::new(
+                        ErrorCode::AuthUserAlreadyExists,
+                        "이미 사용 중인 아이디입니다.",
+                    ));
                 }
             }
             user.username = clean;
@@ -215,7 +231,7 @@ impl UserRepository for Database {
     }
 
     async fn follow_user(&self, follower_id: Uuid, followee_id: Uuid) -> Result<User, DomainError> {
-        let followee = self.get_user_by_id(followee_id).await.ok_or_else(|| {
+        let followee = self.get_user_by_id(followee_id).await?.ok_or_else(|| {
             DomainError::new(ErrorCode::UserNotFound, ErrorCode::UserNotFound.as_str())
         })?;
 
@@ -242,7 +258,7 @@ impl UserRepository for Database {
         follower_id: Uuid,
         followee_id: Uuid,
     ) -> Result<User, DomainError> {
-        let followee = self.get_user_by_id(followee_id).await.ok_or_else(|| {
+        let followee = self.get_user_by_id(followee_id).await?.ok_or_else(|| {
             DomainError::new(ErrorCode::UserNotFound, ErrorCode::UserNotFound.as_str())
         })?;
 
@@ -256,30 +272,34 @@ impl UserRepository for Database {
         Ok(followee)
     }
 
-    async fn get_followers(&self, user_id: Uuid) -> Vec<User> {
-        db_fetch_all!(
+    async fn get_followers(&self, user_id: Uuid) -> Result<Vec<User>, DomainError> {
+        let entities = db_fetch_all!(
             self,
             UserEntity,
             "SELECT u.* FROM users u JOIN follows f ON u.id = f.follower_id WHERE f.followee_id = $1",
             user_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(User::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, user_id = %user_id, "Failed to get followers");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get followers")
+        })?;
+
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
-    async fn get_following(&self, user_id: Uuid) -> Vec<User> {
-        db_fetch_all!(
+    async fn get_following(&self, user_id: Uuid) -> Result<Vec<User>, DomainError> {
+        let entities = db_fetch_all!(
             self,
             UserEntity,
             "SELECT u.* FROM users u JOIN follows f ON u.id = f.followee_id WHERE f.follower_id = $1",
             user_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(User::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, user_id = %user_id, "Failed to get following");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get following")
+        })?;
+
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
     async fn get_followers_count(&self, user_id: Uuid) -> usize {
@@ -302,20 +322,26 @@ impl UserRepository for Database {
         .unwrap_or(0) as usize
     }
 
-    async fn search_users(&self, query: &str, limit: Option<usize>) -> Vec<User> {
+    async fn search_users(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<User>, DomainError> {
         let lim = limit.unwrap_or(20) as i64;
         let pattern = format!("%{}%", query.to_lowercase());
-        db_fetch_all!(
+        let entities = db_fetch_all!(
             self,
             UserEntity,
             "SELECT * FROM users WHERE LOWER(username) LIKE $1 OR LOWER(display_name) LIKE $1 ORDER BY created_at DESC LIMIT $2",
             pattern,
             lim
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(User::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, query = %query, "Failed to search users");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to search users")
+        })?;
+
+        Ok(entities.into_iter().map(User::from).collect())
     }
 
     // Trust & Safety: Blocks
@@ -498,7 +524,7 @@ impl UserRepository for Database {
     ) -> Result<User, DomainError> {
         let requester = self
             .get_user_by_id(requester_id)
-            .await
+            .await?
             .ok_or_else(|| DomainError::new(ErrorCode::UserNotFound, "Requester not found"))?;
 
         let rows = db_execute!(
@@ -557,17 +583,22 @@ impl UserRepository for Database {
         }
     }
 
-    async fn get_pending_follow_requests(&self, target_id: Uuid) -> Vec<FollowRequest> {
-        db_fetch_all!(
+    async fn get_pending_follow_requests(
+        &self,
+        target_id: Uuid,
+    ) -> Result<Vec<FollowRequest>, DomainError> {
+        let entities = db_fetch_all!(
             self,
             FollowRequestEntity,
             "SELECT * FROM follow_requests WHERE target_id = $1 AND status = 'PENDING' ORDER BY created_at DESC",
             target_id
         )
-        .unwrap_or_default()
-        .into_iter()
-        .map(FollowRequest::from)
-        .collect()
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, target_id = %target_id, "Failed to get pending follow requests");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to get pending follow requests")
+        })?;
+
+        Ok(entities.into_iter().map(FollowRequest::from).collect())
     }
 
     async fn has_pending_follow_request(&self, requester_id: Uuid, target_id: Uuid) -> bool {
@@ -627,6 +658,90 @@ impl UserRepository for Database {
         .map_err(|e| {
             error!(target: "serve::db", error = %e, "Failed to disable 2FA");
             DomainError::new(ErrorCode::ErrorInternal, "Failed to disable 2FA")
+        })?;
+        Ok(true)
+    }
+
+    async fn store_refresh_token(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        token_hash: String,
+        jti: String,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), DomainError> {
+        let now = Utc::now();
+        db_execute!(
+            self,
+            "INSERT INTO refresh_tokens (id, user_id, token_hash, jti, expires_at, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+            id,
+            user_id,
+            &token_hash,
+            &jti,
+            expires_at,
+            now
+        )
+        .map_err(|e| {
+            error!(target: "serve::db", error = %e, "Failed to store refresh token");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to store refresh token")
+        })?;
+        Ok(())
+    }
+
+    async fn find_refresh_token(
+        &self,
+        token_hash: &str,
+    ) -> Result<
+        Option<(
+            Uuid,
+            Uuid,
+            String,
+            chrono::DateTime<chrono::Utc>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )>,
+        DomainError,
+    > {
+        use crate::infrastructure::db::entities::RefreshTokenEntity;
+        let entity = db_fetch_optional!(
+            self,
+            RefreshTokenEntity,
+            "SELECT * FROM refresh_tokens WHERE token_hash = $1",
+            token_hash
+        )
+        .map_err(|e| {
+            error!(target: "serve::user_repo", error = %e, "Failed to find refresh token");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to find refresh token")
+        })?;
+
+        Ok(entity.map(|e| (e.id, e.user_id, e.jti, e.expires_at, e.revoked_at)))
+    }
+
+    async fn revoke_refresh_token(&self, token_hash: &str) -> Result<bool, DomainError> {
+        let now = Utc::now();
+        db_execute!(
+            self,
+            "UPDATE refresh_tokens SET revoked_at = $1 WHERE token_hash = $2 AND revoked_at IS NULL",
+            now,
+            token_hash
+        )
+        .map_err(|e| {
+            error!(target: "serve::db", error = %e, "Failed to revoke refresh token");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to revoke refresh token")
+        })?;
+        Ok(true)
+    }
+
+    async fn revoke_all_user_refresh_tokens(&self, user_id: Uuid) -> Result<bool, DomainError> {
+        let now = Utc::now();
+        db_execute!(
+            self,
+            "UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL",
+            now,
+            user_id
+        )
+        .map_err(|e| {
+            error!(target: "serve::db", error = %e, "Failed to revoke all user refresh tokens");
+            DomainError::new(ErrorCode::ErrorInternal, "Failed to revoke user sessions")
         })?;
         Ok(true)
     }

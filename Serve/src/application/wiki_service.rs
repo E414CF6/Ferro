@@ -210,27 +210,20 @@ impl<R: WikiRepository> WikiService<R> {
         geojson: Option<String>,
         edit_summary: Option<String>,
     ) -> Result<WikiArticle, DomainError> {
-        let existing = self
-            .repo
-            .find_article_by_slug(slug)
-            .await?
-            .ok_or_else(|| DomainError::new(ErrorCode::WikiArticleNotFound, "Wiki article not found"))?;
+        let existing = self.repo.find_article_by_slug(slug).await?.ok_or_else(|| {
+            DomainError::new(ErrorCode::WikiArticleNotFound, "Wiki article not found")
+        })?;
 
         let new_title = title.unwrap_or(existing.title);
         let new_content = content.unwrap_or(existing.content);
         let new_lat = latitude.unwrap_or(existing.latitude);
         let new_lng = longitude.unwrap_or(existing.longitude);
         let new_zoom = zoom.unwrap_or(existing.zoom);
-        let new_tags = tags
-            .map(|t| Self::parse_tags(&t))
-            .unwrap_or(existing.tags);
+        let new_tags = tags.map(|t| Self::parse_tags(&t)).unwrap_or(existing.tags);
 
         validate_wiki_article(&new_title, &new_content, new_lat, new_lng, &new_tags)?;
 
-        let primary_category = new_tags
-            .first()
-            .cloned()
-            .unwrap_or(existing.category);
+        let primary_category = new_tags.first().cloned().unwrap_or(existing.category);
 
         let new_summary = summary
             .map(|s| s.trim().to_string())
@@ -288,7 +281,10 @@ impl<R: WikiRepository> WikiService<R> {
         Ok(success)
     }
 
-    pub async fn get_article_by_slug(&self, slug: &str) -> Result<Option<WikiArticle>, DomainError> {
+    pub async fn get_article_by_slug(
+        &self,
+        slug: &str,
+    ) -> Result<Option<WikiArticle>, DomainError> {
         self.repo.find_article_by_slug(slug).await
     }
 
@@ -354,10 +350,7 @@ impl<R: WikiRepository> WikiService<R> {
             .repo
             .get_view_log_counts_since(twenty_four_hours_ago)
             .await?;
-        let logs_3h = self
-            .repo
-            .get_view_log_counts_since(three_hours_ago)
-            .await?;
+        let logs_3h = self.repo.get_view_log_counts_since(three_hours_ago).await?;
 
         let map_24h: HashMap<Uuid, i64> = logs_24h.into_iter().collect();
         let map_3h: HashMap<Uuid, i64> = logs_3h.into_iter().collect();
@@ -392,9 +385,8 @@ impl<R: WikiRepository> WikiService<R> {
             } else {
                 0
             };
-            let past_score = past_3_to_24h * 4
-                + (baseline_views as f64 * 0.8).round() as i64
-                + past_recency;
+            let past_score =
+                past_3_to_24h * 4 + (baseline_views as f64 * 0.8).round() as i64 + past_recency;
 
             let hours_since_created = (now - art.created_at).num_seconds() as f64 / 3600.0;
             let is_new = hours_since_created <= 24.0;

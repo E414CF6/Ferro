@@ -1,10 +1,7 @@
+use crate::application::AppServices;
 use crate::application::helpers::resolve_user_id;
 use crate::domain::models::{MediaType, NotificationType, PostAudience, PostMedia};
-use crate::domain::repositories::{
-    BookmarkRepository, NotificationRepository, PostRepository, UserRepository,
-};
 use crate::graphql::types::{CreatePollInput, MediaInput, PostAudienceGql, PostGql};
-use crate::infrastructure::db::postgres::Database;
 use crate::infrastructure::pubsub::MessageBroker;
 use async_graphql::{Context, ErrorExtensions, ID, Object, Result};
 use chrono::Utc;
@@ -29,13 +26,14 @@ impl PostMutation {
         let valid_content =
             crate::domain::validation::validate_post_content(&content).map_err(|e| e.extend())?;
         let aid = resolve_user_id(ctx, author_id)?;
-        let db = ctx.data::<Database>()?;
+        let services = ctx.data::<AppServices>()?;
         let aud_model = audience.map(PostAudience::from);
 
         if let Some(qid_val) = quote_post_id {
             if !qid_val.as_str().is_empty() {
                 let qid = Uuid::parse_str(qid_val.as_str())?;
-                let post = db
+                let post = services
+                    .post
                     .create_quote_post(aid, qid, valid_content)
                     .await
                     .map_err(|e| e.extend())?;
@@ -68,7 +66,8 @@ impl PostMutation {
             (p.question, p.options, duration)
         });
 
-        let post = db
+        let post = services
+            .post
             .create_post_with_details(aid, valid_content, aud_model, post_media_list, poll_tuple)
             .await
             .map_err(|e| e.extend())?;
@@ -81,9 +80,12 @@ impl PostMutation {
                         .chars()
                         .take_while(|c| c.is_alphanumeric() || *c == '_')
                         .collect();
-                    if let Some(target_user) = db.get_user_by_username(&clean).await {
+                    if let Ok(Some(target_user)) =
+                        services.social.get_user_by_username(&clean).await
+                    {
                         if target_user.id != aid {
-                            if let Ok(notif) = db
+                            if let Ok(notif) = services
+                                .notification
                                 .create_notification(
                                     target_user.id,
                                     aid,
@@ -112,8 +114,12 @@ impl PostMutation {
     ) -> Result<bool> {
         let vid = resolve_user_id(ctx, viewer_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        db.record_post_view(pid, vid).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .post
+            .record_post_view(pid, vid)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Quote an existing post with commentary
@@ -128,17 +134,19 @@ impl PostMutation {
             crate::domain::validation::validate_post_content(&content).map_err(|e| e.extend())?;
         let aid = resolve_user_id(ctx, author_id)?;
         let qid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .post
             .create_quote_post(aid, qid, valid_content)
             .await
             .map_err(|e| e.extend())?;
 
         // Trigger quote notification to original post author
         if let Ok(broker) = ctx.data::<MessageBroker>() {
-            if let Some(orig_post) = db.get_post_by_id(qid).await {
+            if let Ok(Some(orig_post)) = services.post.get_post_by_id(qid).await {
                 if orig_post.author_id != aid {
-                    if let Ok(notif) = db
+                    if let Ok(notif) = services
+                        .notification
                         .create_notification(
                             orig_post.author_id,
                             aid,
@@ -165,13 +173,18 @@ impl PostMutation {
     ) -> Result<PostGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.repost_post(uid, pid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .post
+            .repost_post(uid, pid)
+            .await
+            .map_err(|e| e.extend())?;
 
         // Trigger Repost notification
         if post.author_id != uid {
             if let Ok(broker) = ctx.data::<MessageBroker>() {
-                if let Ok(notif) = db
+                if let Ok(notif) = services
+                    .notification
                     .create_notification(
                         post.author_id,
                         uid,
@@ -197,8 +210,12 @@ impl PostMutation {
     ) -> Result<PostGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.unrepost_post(uid, pid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .post
+            .unrepost_post(uid, pid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(PostGql(post))
     }
 
@@ -214,8 +231,9 @@ impl PostMutation {
             crate::domain::validation::validate_post_content(&content).map_err(|e| e.extend())?;
         let aid = resolve_user_id(ctx, author_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .post
             .update_post(pid, aid, valid_content)
             .await
             .map_err(|e| e.extend())?;
@@ -231,8 +249,12 @@ impl PostMutation {
     ) -> Result<bool> {
         let aid = resolve_user_id(ctx, author_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        db.delete_post(pid, aid).await.map_err(|e| e.extend())
+        let services = ctx.data::<AppServices>()?;
+        services
+            .post
+            .delete_post(pid, aid)
+            .await
+            .map_err(|e| e.extend())
     }
 
     /// Like a post
@@ -244,12 +266,17 @@ impl PostMutation {
     ) -> Result<PostGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.like_post(uid, pid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .post
+            .like_post(uid, pid)
+            .await
+            .map_err(|e| e.extend())?;
 
         // Real-time notification trigger for post author
         if post.author_id != uid {
-            if let Ok(notif) = db
+            if let Ok(notif) = services
+                .notification
                 .create_notification(
                     post.author_id,
                     uid,
@@ -276,8 +303,12 @@ impl PostMutation {
     ) -> Result<PostGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.unlike_post(uid, pid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .post
+            .unlike_post(uid, pid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(PostGql(post))
     }
 
@@ -290,8 +321,12 @@ impl PostMutation {
     ) -> Result<PostGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.save_post(uid, pid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .bookmark
+            .save_post(uid, pid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(PostGql(post))
     }
 
@@ -304,8 +339,12 @@ impl PostMutation {
     ) -> Result<PostGql> {
         let uid = resolve_user_id(ctx, user_id)?;
         let pid = Uuid::parse_str(&post_id)?;
-        let db = ctx.data::<Database>()?;
-        let post = db.unsave_post(uid, pid).await.map_err(|e| e.extend())?;
+        let services = ctx.data::<AppServices>()?;
+        let post = services
+            .bookmark
+            .unsave_post(uid, pid)
+            .await
+            .map_err(|e| e.extend())?;
         Ok(PostGql(post))
     }
 }
