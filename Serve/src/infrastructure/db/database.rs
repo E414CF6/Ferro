@@ -14,6 +14,40 @@ pub enum DatabaseBackend {
     Sqlite(SqlitePool),
 }
 
+pub enum DatabaseTransaction {
+    Postgres(sqlx::Transaction<'static, sqlx::Postgres>),
+    Sqlite(sqlx::Transaction<'static, sqlx::Sqlite>),
+}
+
+impl DatabaseTransaction {
+    pub async fn commit(self) -> Result<(), DomainError> {
+        match self {
+            DatabaseTransaction::Postgres(tx) => tx.commit().await.map_err(|e| {
+                error!(target: "serve::db", error = %e, "Failed to commit Postgres transaction");
+                DomainError::new(ErrorCode::ErrorInternal, "Failed to commit transaction")
+            }),
+            DatabaseTransaction::Sqlite(tx) => tx.commit().await.map_err(|e| {
+                error!(target: "serve::db", error = %e, "Failed to commit SQLite transaction");
+                DomainError::new(ErrorCode::ErrorInternal, "Failed to commit transaction")
+            }),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub async fn rollback(self) -> Result<(), DomainError> {
+        match self {
+            DatabaseTransaction::Postgres(tx) => tx.rollback().await.map_err(|e| {
+                error!(target: "serve::db", error = %e, "Failed to rollback Postgres transaction");
+                DomainError::new(ErrorCode::ErrorInternal, "Failed to rollback transaction")
+            }),
+            DatabaseTransaction::Sqlite(tx) => tx.rollback().await.map_err(|e| {
+                error!(target: "serve::db", error = %e, "Failed to rollback SQLite transaction");
+                DomainError::new(ErrorCode::ErrorInternal, "Failed to rollback transaction")
+            }),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Database {
     backend: DatabaseBackend,
@@ -34,6 +68,8 @@ impl Database {
 
                 if config.sqlite_path != ":memory:"
                     && !config.sqlite_path.starts_with("sqlite::memory:")
+                    && !config.sqlite_path.contains("mode=memory")
+                    && !config.sqlite_path.starts_with("file:")
                 {
                     let path = std::path::Path::new(&config.sqlite_path);
                     if let Some(parent) = path.parent() {
@@ -135,8 +171,80 @@ impl Database {
         Self::connect(&DatabaseConfig::sqlite_mode(file_path)).await
     }
 
+    /// Connect to a database for testing.
+    /// Attempts connection to PostgreSQL with a 1-second fast timeout.
+    /// If PostgreSQL is unreachable or fails, transparently falls back to an isolated
+    /// SQLite shared in-memory database with automated schema initialization.
+    #[allow(dead_code)]
+    pub async fn connect_test_db() -> Self {
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
+
+        if database_url.starts_with("postgres://") || database_url.starts_with("postgresql://") {
+            let mut pg_config = DatabaseConfig::from_url(&database_url);
+            pg_config.connect_timeout_secs = 1;
+            pg_config.acquire_timeout_secs = 1;
+
+            match tokio::time::timeout(
+                std::time::Duration::from_millis(1000),
+                Self::connect(&pg_config),
+            )
+            .await
+            {
+                Ok(Ok(db)) => {
+                    info!(target: "serve::test", "Connected to PostgreSQL database for testing");
+                    return db;
+                }
+                _ => {
+                    info!(
+                        target: "serve::test",
+                        "PostgreSQL not reachable for tests; falling back to SQLite in-memory database"
+                    );
+                }
+            }
+        }
+
+        Self::connect_test_sqlite_memory().await
+    }
+
+    /// Creates an isolated, shared-cache in-memory SQLite database initialized with full schema.
+    #[allow(dead_code)]
+    pub async fn connect_test_sqlite_memory() -> Self {
+        let mem_url = format!(
+            "sqlite:file:test_mem_{}?mode=memory&cache=shared",
+            Uuid::new_v4()
+        );
+        let mut sqlite_config = DatabaseConfig::sqlite_mode(&mem_url);
+        sqlite_config.auto_migrate = true;
+        sqlite_config.max_connections = 5;
+        sqlite_config.min_connections = 1;
+
+        Self::connect(&sqlite_config)
+            .await
+            .expect("Failed to initialize SQLite test in-memory database")
+    }
+
     pub fn backend(&self) -> &DatabaseBackend {
         &self.backend
+    }
+
+    pub async fn begin(&self) -> Result<DatabaseTransaction, DomainError> {
+        match &self.backend {
+            DatabaseBackend::Postgres(pool) => {
+                let tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to begin Postgres transaction");
+                    DomainError::new(ErrorCode::ErrorInternal, "Failed to begin transaction")
+                })?;
+                Ok(DatabaseTransaction::Postgres(tx))
+            }
+            DatabaseBackend::Sqlite(pool) => {
+                let tx = pool.begin().await.map_err(|e| {
+                    error!(target: "serve::db", error = %e, "Failed to begin SQLite transaction");
+                    DomainError::new(ErrorCode::ErrorInternal, "Failed to begin transaction")
+                })?;
+                Ok(DatabaseTransaction::Sqlite(tx))
+            }
+        }
     }
 
     pub fn is_sqlite(&self) -> bool {

@@ -10,16 +10,7 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_health_liveness_endpoints() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
-
-    let db = match Database::connect_url(&database_url).await {
-        Ok(db) => db,
-        Err(e) => {
-            eprintln!("Skipping test: PostgreSQL connection failed: {}", e);
-            return;
-        }
-    };
+    let db = Database::connect_test_db().await;
 
     let config = AppConfig::default();
     let schema = build_schema(

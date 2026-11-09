@@ -636,3 +636,31 @@ async fn test_post_creation_transaction_atomicity() {
     let _ = std::fs::remove_file(format!("{}-shm", test_file));
     let _ = std::fs::remove_file(format!("{}-wal", test_file));
 }
+
+#[tokio::test]
+async fn test_connect_test_db_sqlite_memory_fallback() {
+    let db = Database::connect_test_db().await;
+    assert!(db.is_sqlite() || db.is_postgres());
+
+    let user = db
+        .register_user(
+            format!("test_mem_user_{}", Uuid::new_v4().simple()),
+            format!("test_mem_{}@example.com", Uuid::new_v4().simple()),
+            "hashed_pw".to_string(),
+            "Memory User".to_string(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to register user in memory test db");
+
+    let fetched = db
+        .get_user_by_id(user.id)
+        .await
+        .expect("Failed to get user")
+        .expect("User should exist");
+    assert_eq!(fetched.id, user.id);
+}

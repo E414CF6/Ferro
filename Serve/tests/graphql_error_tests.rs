@@ -10,16 +10,7 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn test_graphql_standard_error_codes_and_extensions() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
-
-    let db = match Database::connect_url(&database_url).await {
-        Ok(db) => db,
-        Err(e) => {
-            eprintln!("Skipping test: PostgreSQL connection failed: {}", e);
-            return;
-        }
-    };
+    let db = Database::connect_test_db().await;
 
     let config = AppConfig::default();
     let schema = build_schema(
@@ -86,16 +77,7 @@ async fn test_graphql_standard_error_codes_and_extensions() {
 
 #[tokio::test]
 async fn test_graphql_introspection_disabled_in_production() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
-
-    let db = match Database::connect_url(&database_url).await {
-        Ok(db) => db,
-        Err(e) => {
-            eprintln!("Skipping test: PostgreSQL connection failed: {}", e);
-            return;
-        }
-    };
+    let db = Database::connect_test_db().await;
 
     let config = AppConfig::default();
     // Build schema with enable_introspection = false

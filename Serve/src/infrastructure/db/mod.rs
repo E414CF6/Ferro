@@ -6,7 +6,7 @@ pub mod entities;
 pub mod loaders;
 pub use database as postgres;
 #[allow(unused_imports)]
-pub use database::{Database, DatabaseBackend};
+pub use database::{Database, DatabaseBackend, DatabaseTransaction};
 
 mod bookmark_repo;
 mod comment_repo;

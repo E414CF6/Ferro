@@ -154,3 +154,111 @@ macro_rules! db_scalar_optional {
         }
     };
 }
+
+#[macro_export]
+macro_rules! db_tx_execute {
+    ($tx:expr, $sql:expr $(, $bind:expr)*) => {
+        match $tx {
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Postgres(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query::<sqlx::Postgres>($sql);
+                $(query = query.bind($bind);)*
+                query.execute(&mut **tx).await.map(|r| {
+                    $crate::infrastructure::db::macros::DbQueryResult {
+                        rows_affected: sqlx::postgres::PgQueryResult::rows_affected(&r),
+                    }
+                })
+            }
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Sqlite(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query::<sqlx::Sqlite>($sql);
+                $(query = query.bind($bind);)*
+                query.execute(&mut **tx).await.map(|r| {
+                    $crate::infrastructure::db::macros::DbQueryResult {
+                        rows_affected: sqlx::sqlite::SqliteQueryResult::rows_affected(&r),
+                    }
+                })
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! db_tx_fetch_all {
+    ($tx:expr, $entity:ty, $sql:expr $(, $bind:expr)*) => {
+        match $tx {
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Postgres(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_as::<sqlx::Postgres, $entity>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_all(&mut **tx).await
+            }
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Sqlite(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_as::<sqlx::Sqlite, $entity>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_all(&mut **tx).await
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! db_tx_fetch_optional {
+    ($tx:expr, $entity:ty, $sql:expr $(, $bind:expr)*) => {
+        match $tx {
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Postgres(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_as::<sqlx::Postgres, $entity>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_optional(&mut **tx).await
+            }
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Sqlite(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_as::<sqlx::Sqlite, $entity>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_optional(&mut **tx).await
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! db_tx_fetch_one {
+    ($tx:expr, $entity:ty, $sql:expr $(, $bind:expr)*) => {
+        match $tx {
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Postgres(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_as::<sqlx::Postgres, $entity>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_one(&mut **tx).await
+            }
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Sqlite(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_as::<sqlx::Sqlite, $entity>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_one(&mut **tx).await
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! db_tx_scalar {
+    ($tx:expr, $ty:ty, $sql:expr $(, $bind:expr)*) => {
+        match $tx {
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Postgres(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_scalar::<sqlx::Postgres, $ty>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_one(&mut **tx).await
+            }
+            &mut $crate::infrastructure::db::database::DatabaseTransaction::Sqlite(ref mut tx) => {
+                #[allow(unused_mut)]
+                let mut query = sqlx::query_scalar::<sqlx::Sqlite, $ty>($sql);
+                $(query = query.bind($bind);)*
+                query.fetch_one(&mut **tx).await
+            }
+        }
+    };
+}

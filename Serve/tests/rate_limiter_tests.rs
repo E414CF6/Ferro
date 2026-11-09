@@ -48,16 +48,7 @@ async fn test_rate_limiter_sliding_window() {
 
 #[tokio::test]
 async fn test_rate_limiter_http_middleware_integration() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
-
-    let db = match Database::connect_url(&database_url).await {
-        Ok(db) => db,
-        Err(e) => {
-            eprintln!("Skipping test: PostgreSQL connection failed: {}", e);
-            return;
-        }
-    };
+    let db = Database::connect_test_db().await;
 
     let mut config = AppConfig::default();
     config.rate_limit.max_requests = 2; // Only 2 requests allowed

@@ -20,19 +20,7 @@ fn test_cursor_encoding_and_decoding() {
 
 #[tokio::test]
 async fn test_social_features_flow() {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://serve:password@localhost:5432/serve".to_string());
-
-    let db = match Database::connect_url(&database_url).await {
-        Ok(db) => db,
-        Err(e) => {
-            eprintln!(
-                "Skipping integration test: PostgreSQL connection failed: {}",
-                e
-            );
-            return;
-        }
-    };
+    let db = Database::connect_test_db().await;
 
     let broker = serve::infrastructure::pubsub::MessageBroker::default();
     let schema = build_schema(db, AuthConfig::default(), broker);
